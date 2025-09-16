@@ -244,7 +244,7 @@ export const useStudentsHybrid = (excludeCurrentUser?: string, onlyRegistered = 
   }, [studentOptions])
 
   // 등록되지 않은 학생 목록
-  const unregisteredStudents = studentOptions.filter(option => !option.isRegistered)
+  const unregisteredStudents = studentOptions?.filter(option => !option.isRegistered) || []
 
   return {
     studentOptions,
@@ -254,7 +254,7 @@ export const useStudentsHybrid = (excludeCurrentUser?: string, onlyRegistered = 
     isStudentRegistered,
     unregisteredStudents,
     totalStudents: CURRENT_STUDENTS.length,
-    registeredCount: studentOptions.filter(o => o.isRegistered).length
+    registeredCount: studentOptions?.filter(o => o.isRegistered).length || 0
   }
 }
 

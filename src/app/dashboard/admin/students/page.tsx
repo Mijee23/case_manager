@@ -148,7 +148,7 @@ export default function StudentsManagementPage() {
             <AlertTriangle className="h-4 w-4 text-amber-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-amber-600">{unregisteredStudents.length}명</div>
+            <div className="text-2xl font-bold text-amber-600">{unregisteredStudents?.length || 0}명</div>
             <p className="text-xs text-muted-foreground">회원가입 필요</p>
           </CardContent>
         </Card>
@@ -262,7 +262,7 @@ export default function StudentsManagementPage() {
       </Card>
 
       {/* 미등록 학생 목록 */}
-      {unregisteredStudents.length > 0 && (
+      {unregisteredStudents && unregisteredStudents.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -272,7 +272,7 @@ export default function StudentsManagementPage() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-              {unregisteredStudents.map((student) => (
+              {unregisteredStudents?.map((student) => (
                 <Badge key={student.id} variant="secondary" className="justify-start">
                   {student.label}
                 </Badge>
@@ -289,7 +289,7 @@ export default function StudentsManagementPage() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-            {studentOptions.map((student) => (
+            {studentOptions?.map((student) => (
               <div key={student.id} className="flex items-center justify-between p-2 border rounded">
                 <span className="text-sm">{student.label}</span>
                 <Badge variant={student.isRegistered ? "default" : "secondary"}>
