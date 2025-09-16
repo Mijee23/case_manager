@@ -1,7 +1,7 @@
 'use client'
 
 import { createSupabaseClient } from '@/lib/supabase'
-import { StudentCaseStats, CategoryDistribution, User, Case } from '@/types/database'
+import { StudentCaseStats, CategoryDistribution } from '@/types/database'
 
 export class StudentCaseAnalytics {
   private supabase = createSupabaseClient()
@@ -198,7 +198,7 @@ export class StudentCaseAnalytics {
         let totalStudentCases = 0
 
         students?.forEach(student => {
-          const count = (student as any)[`case_count_${category}`] || 0
+          const count = (student as Record<string, unknown>)[`case_count_${category}`] as number || 0
           totalStudentCases += count
 
           if (count === 0) studentsWithZero++
@@ -271,7 +271,7 @@ export class StudentCaseAnalytics {
 
       if (error) throw error
 
-      return (student as any)[`case_count_${category}`] || 0
+      return (student as Record<string, unknown>)[`case_count_${category}`] as number || 0
     } catch (error) {
       console.error('Error fetching student case count:', error)
       return 0
