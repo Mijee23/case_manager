@@ -19,13 +19,13 @@ export default function StudentsManagementPage() {
   const [isUploading, setIsUploading] = useState(false)
   const [previewData, setPreviewData] = useState<any[]>([])
   
-  const { 
-    studentOptions, 
-    loading, 
+  const {
+    studentOptions = [],
+    loading,
     refreshStudents,
-    registeredCount,
-    totalStudents,
-    unregisteredStudents 
+    registeredCount = 0,
+    totalStudents = 0,
+    unregisteredStudents = []
   } = useStudentsHybrid()
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -77,9 +77,9 @@ export default function StudentsManagementPage() {
       
       logComparisonResults(comparison)
       
-      if (comparison.onlyInDB.length > 0) {
-        toast.warning(`DB에 ${comparison.onlyInDB.length}명의 추가 학생이 있습니다. 콘솔을 확인하세요.`)
-      } else if (comparison.matchedCount === comparison.totalDB) {
+      if (comparison?.onlyInDB?.length > 0) {
+        toast.warning(`DB에 ${comparison.onlyInDB?.length || 0}명의 추가 학생이 있습니다. 콘솔을 확인하세요.`)
+      } else if (comparison?.matchedCount === comparison?.totalDB) {
         toast.success('모든 DB 사용자가 하드코딩 데이터와 정확히 매칭됩니다!')
       }
     } catch (error) {
@@ -94,13 +94,15 @@ export default function StudentsManagementPage() {
       const dbStudents = await fetchAllStudentsFromDB()
       const code = generateStudentDataCode(dbStudents)
       
-      // 클립보드에 복사
-      await navigator.clipboard.writeText(code)
+      // 클립보드에 복사 (브라우저에서만)
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(code)
+      }
       
       console.log('=== 생성된 하드코딩 코드 ===')
       console.log(code)
       
-      toast.success(`DB 기반 하드코딩 코드가 클립보드에 복사되었습니다! (${dbStudents.length}명)`)
+      toast.success(`DB 기반 하드코딩 코드가 클립보드에 복사되었습니다! (${dbStudents?.length || 0}명)`
     } catch (error) {
       console.error('코드 생성 실패:', error)
       toast.error('코드 생성 중 오류가 발생했습니다.')
@@ -241,18 +243,18 @@ export default function StudentsManagementPage() {
             </div>
           )}
 
-          {previewData.length > 0 && (
+          {previewData && previewData.length > 0 && (
             <div className="space-y-2">
-              <h3 className="font-semibold">미리보기 ({previewData.length}명)</h3>
+              <h3 className="font-semibold">미리보기 ({previewData?.length || 0}명)</h3>
               <div className="max-h-40 overflow-y-auto border rounded p-2">
-                {previewData.slice(0, 10).map((student, index) => (
+                {previewData?.slice(0, 10).map((student, index) => (
                   <div key={index} className="text-sm">
                     {student.number} - {student.name}
                   </div>
                 ))}
-                {previewData.length > 10 && (
+                {previewData && previewData.length > 10 && (
                   <div className="text-sm text-muted-foreground">
-                    ... 외 {previewData.length - 10}명
+                    ... 외 {(previewData?.length || 0) - 10}명
                   </div>
                 )}
               </div>
