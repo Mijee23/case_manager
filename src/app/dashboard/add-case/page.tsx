@@ -41,6 +41,16 @@ export default function AddCasePage() {
 
   const supabase = createSupabaseClient()
 
+  // 현재 사용자의 학생 번호를 assigned_student1에 자동 설정
+  useEffect(() => {
+    if (user && user.role === '학생' && user.student_number) {
+      setFormData(prev => ({
+        ...prev,
+        assigned_student1: user.student_number
+      }))
+    }
+  }, [user])
+
   // 학생 유효성 검증 헬퍼
   const validateAndGetStudentId = async (studentNumber: string, studentName: string): Promise<string | null> => {
     if (studentNumber === 'none') return null
@@ -75,19 +85,43 @@ export default function AddCasePage() {
     setIsLoading(true)
 
     try {
-      // 같은 환자번호로 등록된 케이스가 있는지 확인
-      const { data: existingCases, error: checkError } = await supabase
+      // 더 정교한 중복 검사: 환자번호 + 분류 + 담당전공의
+      const { data: exactMatches, error: checkError } = await supabase
         .from('cases')
-        .select('*')
+        .select('*, assigned_student1_info:assigned_student1(id, name), assigned_student2_info:assigned_student2(id, name)')
         .eq('patient_number', formData.patient_number)
+        .eq('category', formData.category)
+        .eq('assigned_resident', formData.assigned_resident)
 
       if (checkError) throw checkError
 
-      if (existingCases && existingCases.length > 0) {
-        // 중복된 케이스가 있으면 확인 다이얼로그 표시
-        setDuplicateCases(existingCases)
-        setShowDuplicateDialog(true)
-        setIsLoading(false)
+      if (exactMatches && exactMatches.length > 0) {
+        // 정확히 일치하는 케이스들 중에서 참여 가능한 케이스와 이미 full인 케이스 분류
+        const joinableCases = exactMatches.filter(case_item =>
+          case_item.assigned_student2 === null && // 빈 자리가 있고
+          case_item.assigned_student1 !== user.id // 현재 사용자가 이미 참여하지 않은 케이스
+        )
+
+        const currentUserCases = exactMatches.filter(case_item =>
+          case_item.assigned_student1 === user.id || case_item.assigned_student2 === user.id
+        )
+
+        // 사용자가 이미 참여 중인 케이스가 있으면 경고
+        if (currentUserCases.length > 0) {
+          toast.error('이미 동일한 케이스에 참여하고 있습니다.')
+          setIsLoading(false)
+          return
+        }
+
+        // 참여 가능한 케이스가 있으면 다이얼로그 표시
+        if (joinableCases.length > 0) {
+          setDuplicateCases(joinableCases)
+          setShowDuplicateDialog(true)
+          setIsLoading(false)
+        } else {
+          // 참여 가능한 케이스가 없으면 (모든 케이스가 full) 새 케이스 생성
+          await createCase()
+        }
       } else {
         // 중복이 없으면 바로 케이스 생성
         await createCase()
@@ -177,6 +211,59 @@ export default function AddCasePage() {
       toast.error('케이스 등록 중 오류가 발생했습니다.')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const joinExistingCase = async (caseId: string) => {
+    if (!user) return
+
+    setIsLoading(true)
+
+    try {
+      // 기존 케이스에 현재 사용자를 assigned_student2로 추가
+      const { error: updateError } = await supabase
+        .from('cases')
+        .update({
+          assigned_student2: user.id,
+          change_log: [
+            ...duplicateCases.find(c => c.id === caseId)?.change_log || [],
+            {
+              timestamp: new Date().toISOString(),
+              user_id: user.id,
+              user_name: user.name,
+              action: 'student_joined',
+              details: `${user.name}이(가) 케이스에 참여했습니다.`
+            }
+          ]
+        })
+        .eq('id', caseId)
+
+      if (updateError) throw updateError
+
+      // 케이스 참여 후 양쪽 학생들의 통계 업데이트
+      const targetCase = duplicateCases.find(c => c.id === caseId)
+      const studentsToUpdate = [
+        targetCase?.assigned_student1,
+        user.id
+      ].filter(Boolean) as string[]
+
+      // 각 학생의 케이스 수 동기화
+      for (const studentId of studentsToUpdate) {
+        try {
+          await studentCaseAnalytics.syncStudentCaseCount(studentId)
+        } catch (syncError) {
+          console.error(`Failed to sync case count for student ${studentId}:`, syncError)
+        }
+      }
+
+      toast.success('기존 케이스에 성공적으로 참여했습니다.')
+      router.push('/dashboard/my-cases')
+    } catch (error) {
+      console.error('Error joining existing case:', error)
+      toast.error('케이스 참여 중 오류가 발생했습니다.')
+    } finally {
+      setIsLoading(false)
+      setShowDuplicateDialog(false)
     }
   }
 
@@ -342,36 +429,59 @@ export default function AddCasePage() {
 
       {/* 중복 케이스 확인 다이얼로그 */}
       <Dialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>중복된 케이스가 발견되었습니다</DialogTitle>
+            <DialogTitle>동일한 케이스가 발견되었습니다!</DialogTitle>
             <DialogDescription>
-              환자번호 "{formData.patient_number}"로 이미 등록된 케이스가 {duplicateCases.length}개 있습니다.
+              같은 환자의 동일한 분류 케이스가 이미 등록되어 있습니다.
               <br />
-              그래도 등록하시겠습니까?
+              기존 케이스에 참여하거나 새로운 케이스를 생성할 수 있습니다.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="max-h-60 overflow-y-auto">
-            <div className="space-y-2">
-              <p className="text-sm font-medium">기존 케이스:</p>
-              {duplicateCases.map((case_item, index) => (
-                <div key={case_item.id} className="p-3 bg-muted rounded-md text-sm">
-                  <p><strong>분류:</strong> {case_item.category}</p>
-                  <p><strong>담당 전공의:</strong> {case_item.assigned_resident}</p>
-                  <p><strong>환자명:</strong> {case_item.patient_name}</p>
-                  <p><strong>등록일:</strong> {new Date(case_item.created_at).toLocaleDateString()}</p>
+            <div className="space-y-3">
+              <p className="text-sm font-medium">참여 가능한 케이스:</p>
+              {duplicateCases.map((case_item) => (
+                <div key={case_item.id} className="p-4 border rounded-lg bg-muted/50">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p><strong>환자:</strong> {case_item.patient_name} ({case_item.patient_number})</p>
+                      <p><strong>분류:</strong> {case_item.category}</p>
+                      <p><strong>담당 전공의:</strong> {case_item.assigned_resident}</p>
+                    </div>
+                    <div>
+                      <p><strong>현재 배정:</strong> {case_item.assigned_student1_info?.name || '알 수 없음'}</p>
+                      <p><strong>빈 자리:</strong>
+                        <span className="text-green-600 font-medium ml-1">
+                          1개 (학생 2 미배정)
+                        </span>
+                      </p>
+                      <p><strong>등록일:</strong> {new Date(case_item.created_at).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 mt-3">
+                    <Button
+                      size="sm"
+                      onClick={() => joinExistingCase(case_item.id)}
+                      disabled={isLoading}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      {isLoading ? '참여 중...' : '이 케이스에 참여하기'}
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex justify-between">
             <Button variant="outline" onClick={handleCancelDuplicate}>
               취소
             </Button>
-            <Button onClick={handleConfirmDuplicate} disabled={isLoading}>
-              {isLoading ? '등록 중...' : '예, 등록하겠습니다'}
+            <Button onClick={handleConfirmDuplicate} disabled={isLoading} variant="secondary">
+              {isLoading ? '생성 중...' : '새로운 케이스 생성'}
             </Button>
           </DialogFooter>
         </DialogContent>
