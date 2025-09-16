@@ -102,7 +102,7 @@ export default function StudentsManagementPage() {
       console.log('=== 생성된 하드코딩 코드 ===')
       console.log(code)
       
-      toast.success(`DB 기반 하드코딩 코드가 클립보드에 복사되었습니다! (${dbStudents?.length || 0}명)`
+      toast.success(`DB 기반 하드코딩 코드가 클립보드에 복사되었습니다! (${dbStudents?.length || 0}명)`)
     } catch (error) {
       console.error('코드 생성 실패:', error)
       toast.error('코드 생성 중 오류가 발생했습니다.')
