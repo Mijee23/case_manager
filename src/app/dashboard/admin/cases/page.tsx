@@ -11,9 +11,11 @@ import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { Search, Edit, Save, X, Eye } from 'lucide-react'
 import { format } from 'date-fns'
 import { ko } from 'date-fns/locale'
+import StudentSelectorNew from '@/components/StudentSelectorNew'
 
 interface Case {
   id: string
@@ -48,7 +50,10 @@ export default function AdminCasesPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<Partial<Case>>({})
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [selectedCase, setSelectedCase] = useState<Case | null>(null)
+  const [editingCase, setEditingCase] = useState<Case | null>(null)
+  const [isUpdating, setIsUpdating] = useState(false)
 
   const supabase = createSupabaseClient()
 
@@ -90,9 +95,61 @@ export default function AdminCasesPage() {
     }
   }
 
-  const handleEdit = (caseItem: Case) => {
+  // 기존 인라인 편집을 위한 handleEdit (유지)
+  const handleInlineEdit = (caseItem: Case) => {
     setEditingId(caseItem.id)
     setEditForm(caseItem)
+  }
+
+  // 팝업 편집을 위한 새로운 handleEdit
+  const handleEdit = (caseItem: Case) => {
+    setEditingCase(caseItem)
+    setIsEditDialogOpen(true)
+  }
+
+  // 케이스 수정 처리
+  const handleCaseUpdate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingCase || !user) return
+
+    setIsUpdating(true)
+
+    try {
+      const formData = new FormData(e.target as HTMLFormElement)
+      const updateData = {
+        datetime: new Date(formData.get('datetime') as string).toISOString(),
+        category: formData.get('category') as string,
+        assigned_resident: formData.get('assigned_resident') as string,
+        patient_number: formData.get('patient_number') as string,
+        patient_name: formData.get('patient_name') as string,
+        assigned_student1: (formData.get('assigned_student1') as string) === 'none' ? null : formData.get('assigned_student1') as string,
+        assigned_student2: (formData.get('assigned_student2') as string) === 'none' ? null : formData.get('assigned_student2') as string,
+        case_status: formData.get('case_status') as string,
+        treatment_details: formData.get('treatment_details') as string || null,
+        note: formData.get('note') as string || null,
+      }
+
+      const { error } = await supabase
+        .from('cases')
+        .update(updateData)
+        .eq('id', editingCase.id)
+
+      if (error) throw error
+
+      // 케이스 목록 새로고침
+      await fetchCases()
+      setIsEditDialogOpen(false)
+      setEditingCase(null)
+
+      // 성공 알림
+      alert('케이스가 성공적으로 수정되었습니다.')
+
+    } catch (error) {
+      console.error('Error updating case:', error)
+      alert('케이스 수정 중 오류가 발생했습니다.')
+    } finally {
+      setIsUpdating(false)
+    }
   }
 
   const handleSave = async () => {
@@ -506,6 +563,146 @@ export default function AdminCasesPage() {
                 </div>
               </div>
             </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* 케이스 수정 다이얼로그 */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>케이스 수정</DialogTitle>
+          </DialogHeader>
+          {editingCase && (
+            <form onSubmit={handleCaseUpdate} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="datetime">일시</Label>
+                  <Input
+                    id="datetime"
+                    name="datetime"
+                    type="datetime-local"
+                    defaultValue={new Date(editingCase.datetime).toISOString().slice(0, 16)}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="category">분류</Label>
+                  <Select name="category" defaultValue={editingCase.category}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="분류를 선택하세요" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="가철">가철</SelectItem>
+                      <SelectItem value="고정">고정</SelectItem>
+                      <SelectItem value="임플">임플</SelectItem>
+                      <SelectItem value="임수">임수</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="assigned_resident">담당 전공의</Label>
+                  <Input
+                    id="assigned_resident"
+                    name="assigned_resident"
+                    defaultValue={editingCase.assigned_resident}
+                    placeholder="담당 전공의 이름"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="patient_number">환자번호</Label>
+                  <Input
+                    id="patient_number"
+                    name="patient_number"
+                    defaultValue={editingCase.patient_number}
+                    placeholder="환자번호"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="patient_name">환자명</Label>
+                  <Input
+                    id="patient_name"
+                    name="patient_name"
+                    defaultValue={editingCase.patient_name}
+                    placeholder="환자명"
+                    required
+                  />
+                </div>
+
+                <StudentSelectorNew
+                  label="배정 학생 1"
+                  name="assigned_student1"
+                  defaultValue={editingCase.assigned_student1 || 'none'}
+                  placeholder="학생을 선택하세요"
+                  allowNone={true}
+                  noneLabel="선택 안함"
+                />
+
+                <StudentSelectorNew
+                  label="배정 학생 2"
+                  name="assigned_student2"
+                  defaultValue={editingCase.assigned_student2 || 'none'}
+                  placeholder="학생을 선택하세요"
+                  allowNone={true}
+                  noneLabel="선택 안함"
+                />
+
+                <div className="space-y-2">
+                  <Label htmlFor="case_status">상태</Label>
+                  <Select name="case_status" defaultValue={editingCase.case_status}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="상태를 선택하세요" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="진행중">진행중</SelectItem>
+                      <SelectItem value="완료">완료</SelectItem>
+                      <SelectItem value="실패">실패</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="treatment_details">진료내역</Label>
+                <Textarea
+                  id="treatment_details"
+                  name="treatment_details"
+                  defaultValue={editingCase.treatment_details || ''}
+                  placeholder="진료내역을 입력하세요"
+                  rows={3}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="note">Note</Label>
+                <Textarea
+                  id="note"
+                  name="note"
+                  defaultValue={editingCase.note || ''}
+                  placeholder="추가 메모를 입력하세요"
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex justify-end gap-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsEditDialogOpen(false)}
+                >
+                  취소
+                </Button>
+                <Button type="submit" disabled={isUpdating}>
+                  {isUpdating ? '수정 중...' : '케이스 수정'}
+                </Button>
+              </div>
+            </form>
           )}
         </DialogContent>
       </Dialog>
