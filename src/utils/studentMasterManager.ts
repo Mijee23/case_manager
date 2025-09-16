@@ -133,7 +133,7 @@ export class StudentMasterManager {
    * 회원가입 시 student_master 테이블 업데이트
    * 이 메소드는 서버 사이드 또는 트리거에서 처리되므로 클라이언트에서는 사용하지 않음
    */
-  async updateStudentRegistration(_userNumber: string, _userId: string): Promise<void> {
+  async updateStudentRegistration(): Promise<void> {
     console.warn('updateStudentRegistration should be handled by database triggers')
     // 실제로는 데이터베이스 트리거가 처리하므로 클라이언트에서는 빈 구현
   }

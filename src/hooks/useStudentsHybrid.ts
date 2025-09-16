@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createSupabaseClient } from '@/lib/supabase'
 import { User } from '@/types/database'
-import { CURRENT_STUDENTS, getAllStudentOptions, getStudentLabel } from '@/data/students'
+import { CURRENT_STUDENTS, getStudentLabel } from '@/data/students'
 
 interface StudentOption {
   id: string
@@ -83,7 +83,7 @@ export const useStudentsHybrid = (excludeCurrentUser?: string, onlyRegistered = 
             
             if (result.data) {
               // 학생만 필터링
-              data = result.data.filter((user: any) => user.role === '학생')
+              data = result.data.filter((user: { role: string }) => user.role === '학생')
               error = null
               console.log('API에서 필터링된 학생들:', data)
             }
@@ -216,7 +216,7 @@ export const useStudentsHybrid = (excludeCurrentUser?: string, onlyRegistered = 
           table: 'users',
           filter: 'role=eq.학생'
         }, 
-        (payload: any) => {
+        (payload: unknown) => {
           console.log('학생 회원가입/수정 감지:', payload)
           // 캐시 무효화 및 재빌드
           registeredStudentsCache = []

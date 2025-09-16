@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { studentMasterManager, StudentOption } from '@/utils/studentMasterManager'
 
 export function useStudentMaster() {
@@ -8,7 +8,7 @@ export function useStudentMaster() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchStudentOptions = async () => {
+  const fetchStudentOptions = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -21,11 +21,11 @@ export function useStudentMaster() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     fetchStudentOptions()
-  }, [])
+  }, [fetchStudentOptions])
 
   return {
     studentOptions,
@@ -45,7 +45,7 @@ export function useStudentValidation() {
     setValidationLoading(true)
     try {
       return await studentMasterManager.validateStudentRegistration(studentNumber)
-    } catch (error) {
+    } catch (_error) {
       return {
         isValid: false,
         error: '검증 중 오류가 발생했습니다.'

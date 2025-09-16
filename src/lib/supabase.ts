@@ -15,7 +15,7 @@ export const createSupabaseClient = () => {
   return browserClient || createBrowserClient(supabaseUrl, supabaseAnonKey)
 }
 
-export const createSupabaseServerClient = (cookieStore: any) => {
+export const createSupabaseServerClient = (cookieStore: { get: (name: string) => { value?: string } | undefined }) => {
   return createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
       get(name: string) {
