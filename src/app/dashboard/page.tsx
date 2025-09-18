@@ -50,16 +50,20 @@ export default function DashboardPage() {
 
   const supabase = createSupabaseClient()
 
-  // 관리자 리다이렉트
+  // 역할별 리다이렉트
   useEffect(() => {
     if (user?.role === '관리자') {
       router.replace('/dashboard/admin/cases')
       return
     }
+    if (user?.role === '전공의') {
+      router.replace('/dashboard/doctor-cases')
+      return
+    }
   }, [user, router])
 
   useEffect(() => {
-    if (user && user.role !== '관리자') {
+    if (user && user.role !== '관리자' && user.role !== '전공의') {
       fetchCases()
     }
   }, [user])
@@ -356,8 +360,8 @@ export default function DashboardPage() {
     }))
   }
 
-  // 관리자인 경우 리다이렉트 중
-  if (user?.role === '관리자') {
+  // 관리자 또는 전공의인 경우 리다이렉트 중
+  if (user?.role === '관리자' || user?.role === '전공의') {
     return <div>리다이렉트 중...</div>
   }
 

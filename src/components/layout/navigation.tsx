@@ -4,7 +4,7 @@ import { useUser } from '@/hooks/useUser'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
-import { Menu, Home, User, FileText, RefreshCcw, BarChart, Users, LogOut, UserPlus } from 'lucide-react'
+import { Menu, Home, User, FileText, RefreshCcw, BarChart, Users, LogOut, UserPlus, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -20,6 +20,7 @@ const getNavigationItems = (role: string) => {
       ...baseItems,
       { href: '/dashboard/my-page', label: 'My Page', icon: User },
       { href: '/dashboard/my-cases', label: 'My Cases', icon: FileText },
+      { href: '/dashboard/charting-progress', label: '차팅 현황', icon: TrendingUp },
       { href: '/dashboard/add-case', label: '케이스 입력', icon: FileText },
       { href: '/dashboard/exchange', label: '케이스 교환', icon: RefreshCcw },
       { href: '/dashboard/transfer', label: '케이스 양도', icon: RefreshCcw },
@@ -31,6 +32,7 @@ const getNavigationItems = (role: string) => {
       { href: '/dashboard/admin/cases', label: '전체 케이스', icon: FileText },
       { href: '/dashboard/my-page', label: 'My Page', icon: User },
       { href: '/dashboard/admin', label: '관리자 대시보드', icon: BarChart },
+      { href: '/dashboard/admin/charting-stats', label: '차팅 현황 통계', icon: TrendingUp },
       { href: '/dashboard/admin/upload', label: '엑셀 업로드', icon: FileText },
       { href: '/dashboard/admin/student-list', label: '학생 명단 관리', icon: UserPlus },
       { href: '/dashboard/admin/users', label: '사용자 관리', icon: Users },
@@ -39,7 +41,7 @@ const getNavigationItems = (role: string) => {
 
   if (role === '전공의') {
     return [
-      ...baseItems,
+      { href: '/dashboard/doctor-cases', label: '전체 케이스 확인', icon: FileText },
       { href: '/dashboard/my-page', label: 'My Page', icon: User },
     ]
   }

@@ -147,6 +147,32 @@ export interface Database {
           change_log?: Json
         }
       }
+      charting_progress: {
+        Row: {
+          id: string
+          user_id: string
+          charting_count: number
+          diagnosis_total_count: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          charting_count?: number
+          diagnosis_total_count?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          charting_count?: number
+          diagnosis_total_count?: number
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never
@@ -167,6 +193,7 @@ export type User = Database['public']['Tables']['users']['Row']
 export type Case = Database['public']['Tables']['cases']['Row']
 export type Patient = Database['public']['Tables']['patients']['Row']
 export type StudentMaster = Database['public']['Tables']['student_master']['Row']
+export type ChartingProgress = Database['public']['Tables']['charting_progress']['Row']
 
 // 학생 케이스 통계 타입
 export interface StudentCaseStats {

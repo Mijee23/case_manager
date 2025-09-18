@@ -62,13 +62,33 @@ export function useUser() {
 
   const signOut = async () => {
     try {
-      await supabase.auth.signOut()
+      console.log('로그아웃 시작')
+      const { error } = await supabase.auth.signOut()
+
+      if (error) {
+        console.error('로그아웃 에러:', error)
+        throw error
+      }
+
+      console.log('로그아웃 성공')
+      setUser(null) // 상태 즉시 클리어
       toast.success('로그아웃되었습니다.')
+
       // 로그아웃 후 인증 페이지로 리디렉션
       router.push('/auth')
+
+      // 페이지 강제 새로고침 (캐시 문제 방지)
+      setTimeout(() => {
+        window.location.href = '/auth'
+      }, 100)
+
     } catch (error) {
       console.error('로그아웃 중 오류가 발생했습니다:', error)
       toast.error('로그아웃 중 오류가 발생했습니다.')
+
+      // 에러가 발생해도 강제로 인증 페이지로 이동
+      setUser(null)
+      router.push('/auth')
     }
   }
 
