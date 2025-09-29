@@ -303,11 +303,11 @@ export default function AddCasePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>케이스 정보 입력</CardTitle>
+          <CardTitle className="text-lg md:text-xl">케이스 정보 입력</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
               <div className="space-y-2">
                 <Label htmlFor="datetime">일시</Label>
                 <Input
@@ -367,26 +367,29 @@ export default function AddCasePage() {
                   onChange={(e) => handleInputChange('patient_name', e.target.value)}
                   placeholder="환자명"
                   required
+                  className="text-base"
                 />
               </div>
 
-              <StudentSelectorNew
-                label="배정 학생 1"
-                value={formData.assigned_student1}
-                onValueChange={(value) => handleInputChange('assigned_student1', value)}
-                placeholder="학생을 선택하세요"
-                allowNone={true}
-                noneLabel="본인 (나)"
-              />
+              <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <StudentSelectorNew
+                  label="배정 학생 1"
+                  value={formData.assigned_student1}
+                  onValueChange={(value) => handleInputChange('assigned_student1', value)}
+                  placeholder="학생을 선택하세요"
+                  allowNone={true}
+                  noneLabel="본인 (나)"
+                />
 
-              <StudentSelectorNew
-                label="배정 학생 2"
-                value={formData.assigned_student2}
-                onValueChange={(value) => handleInputChange('assigned_student2', value)}
-                placeholder="학생을 선택하세요"
-                allowNone={true}
-                noneLabel="선택 안함"
-              />
+                <StudentSelectorNew
+                  label="배정 학생 2"
+                  value={formData.assigned_student2}
+                  onValueChange={(value) => handleInputChange('assigned_student2', value)}
+                  placeholder="학생을 선택하세요"
+                  allowNone={true}
+                  noneLabel="선택 안함"
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -397,6 +400,7 @@ export default function AddCasePage() {
                 onChange={(e) => handleInputChange('treatment_details', e.target.value)}
                 placeholder="진료내역을 입력하세요"
                 rows={3}
+                className="resize-none"
               />
             </div>
 
@@ -408,18 +412,24 @@ export default function AddCasePage() {
                 onChange={(e) => handleInputChange('note', e.target.value)}
                 placeholder="추가 메모를 입력하세요"
                 rows={3}
+                className="resize-none"
               />
             </div>
 
-            <div className="flex justify-end gap-4">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => router.push('/dashboard/my-cases')}
+                className="w-full sm:w-auto"
               >
                 취소
               </Button>
-              <Button type="submit" disabled={isLoading}>
+              <Button
+                type="submit"
+                disabled={isLoading}
+                className="w-full sm:w-auto"
+              >
                 {isLoading ? '등록 중...' : '케이스 등록'}
               </Button>
             </div>

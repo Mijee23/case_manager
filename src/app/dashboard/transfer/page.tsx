@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { ResponsiveTable, ResponsiveTableHeader, ResponsiveTableBody, ResponsiveTableRow, ResponsiveTableHead, ResponsiveTableCell } from '@/components/ui/responsive-table'
 import { format } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import { toast } from 'sonner'
@@ -23,6 +24,7 @@ export default function TransferPage() {
   const { user } = useUser()
   const { studentOptions } = useStudentMaster()
   const [selectedStudent, setSelectedStudent] = useState<string>('')
+  const [selectedStudentInfo, setSelectedStudentInfo] = useState<{name: string, number: string} | null>(null)
   const [myCases, setMyCases] = useState<Case[]>([])
   const [selectedCase, setSelectedCase] = useState<Case | null>(null)
   const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false)
@@ -161,10 +163,20 @@ export default function TransferPage() {
           <CardContent>
             <StudentSelectorNew
               value={selectedStudent}
-              onValueChange={setSelectedStudent}
+              onValueChange={(value) => {
+                setSelectedStudent(value)
+                const studentInfo = studentOptions.find(s => s.registeredUserId === value)
+                setSelectedStudentInfo(studentInfo ? { name: studentInfo.name, number: studentInfo.number } : null)
+              }}
               placeholder="양도받을 학생을 선택하세요"
               allowNone={false}
             />
+            {selectedStudentInfo && (
+              <div className="mt-3 p-3 bg-muted/50 rounded-lg">
+                <p className="font-medium">{selectedStudentInfo.name}</p>
+                <p className="text-sm text-muted-foreground">학번: {selectedStudentInfo.number}</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -175,86 +187,100 @@ export default function TransferPage() {
           </CardHeader>
           <CardContent>
             {myCases.length === 0 ? (
-              <p className="text-muted-foreground text-center py-4">
+              <p className="text-muted-foreground text-center py-8">
                 양도 가능한 케이스가 없습니다.
               </p>
             ) : (
-              <div className="space-y-2">
-                {myCases.map(case_ => (
-                  <div
-                    key={case_.id}
-                    className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                      selectedCase?.id === case_.id
-                        ? 'border-primary bg-primary/5'
-                        : 'hover:border-primary/50'
-                    }`}
-                    onClick={() => setSelectedCase(case_)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">{case_.patient_name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          환자번호: {case_.patient_number}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {format(new Date(case_.datetime), 'yyyy-MM-dd HH:mm', { locale: ko })}
-                        </p>
-                      </div>
-                      <div className="text-right space-y-1">
+              <ResponsiveTable>
+                <ResponsiveTableHeader>
+                  <tr>
+                    <ResponsiveTableHead>환자 정보</ResponsiveTableHead>
+                    <ResponsiveTableHead>카테고리</ResponsiveTableHead>
+                    <ResponsiveTableHead>담당 전공의</ResponsiveTableHead>
+                    <ResponsiveTableHead>날짜</ResponsiveTableHead>
+                    <ResponsiveTableHead>취득방법</ResponsiveTableHead>
+                  </tr>
+                </ResponsiveTableHeader>
+                <ResponsiveTableBody>
+                  {myCases.map(case_ => (
+                    <ResponsiveTableRow
+                      key={case_.id}
+                      className={`cursor-pointer transition-colors ${
+                        selectedCase?.id === case_.id
+                          ? 'border-primary bg-primary/5'
+                          : 'hover:border-primary/50'
+                      }`}
+                      onClick={() => setSelectedCase(case_)}
+                    >
+                      <ResponsiveTableCell label="환자">
+                        <div className="space-y-1">
+                          <p className="font-medium">{case_.patient_name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {case_.patient_number}
+                          </p>
+                          {case_.treatment_details && (
+                            <p className="text-xs text-muted-foreground line-clamp-2">
+                              {case_.treatment_details}
+                            </p>
+                          )}
+                        </div>
+                      </ResponsiveTableCell>
+                      <ResponsiveTableCell label="카테고리">
                         <Badge variant="outline">{case_.category}</Badge>
-                        <p className="text-sm text-muted-foreground">
-                          {case_.assigned_resident}
-                        </p>
-                        <Badge variant="secondary">{case_.acquisition_method}</Badge>
-                      </div>
-                    </div>
-
-                    {case_.treatment_details && (
-                      <div className="mt-2 pt-2 border-t">
-                        <p className="text-sm text-muted-foreground">
-                          <strong>진료내역:</strong> {case_.treatment_details}
-                        </p>
-                      </div>
-                    )}
-
-                    {case_.note && (
-                      <div className="mt-1">
-                        <p className="text-sm text-muted-foreground">
-                          <strong>Note:</strong> {case_.note}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
+                      </ResponsiveTableCell>
+                      <ResponsiveTableCell label="담당 전공의">
+                        {case_.assigned_resident}
+                      </ResponsiveTableCell>
+                      <ResponsiveTableCell label="날짜">
+                        <div className="text-sm">
+                          {format(new Date(case_.datetime), 'MM-dd', { locale: ko })}
+                          <br />
+                          <span className="text-xs text-muted-foreground">
+                            {format(new Date(case_.datetime), 'HH:mm', { locale: ko })}
+                          </span>
+                        </div>
+                      </ResponsiveTableCell>
+                      <ResponsiveTableCell label="취득방법">
+                        <Badge variant="secondary" className="text-xs">
+                          {case_.acquisition_method}
+                        </Badge>
+                      </ResponsiveTableCell>
+                    </ResponsiveTableRow>
+                  ))}
+                </ResponsiveTableBody>
+              </ResponsiveTable>
             )}
           </CardContent>
         </Card>
 
         {/* 양도 버튼 */}
-        {selectedCase && selectedStudent && (
+        {selectedCase && selectedStudent && selectedStudentInfo && (
           <Card>
             <CardContent className="pt-6">
-              <div className="text-center space-y-2">
-                <div className="flex items-center justify-center space-x-4">
-                  <div>
+              <div className="text-center space-y-4">
+                <div className="flex flex-col md:flex-row items-center justify-center gap-4">
+                  <div className="text-center md:text-left">
                     <p className="font-medium">{selectedCase.patient_name}</p>
                     <p className="text-sm text-muted-foreground">{selectedCase.category}</p>
                   </div>
 
-                  <Send className="h-6 w-6 text-muted-foreground" />
+                  <Send className="h-6 w-6 text-muted-foreground flex-shrink-0" />
 
-                  <div>
+                  <div className="text-center md:text-right">
                     <p className="font-medium">
-                      선택된 학생
+                      {selectedStudentInfo.name}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      (번호 조회 필요)
+                      학번: {selectedStudentInfo.number}
                     </p>
                   </div>
                 </div>
 
-                <Button onClick={() => setIsTransferDialogOpen(true)} className="mt-4">
+                <Button
+                  onClick={() => setIsTransferDialogOpen(true)}
+                  className="mt-4 w-full md:w-auto"
+                  size="lg"
+                >
                   케이스 양도하기
                 </Button>
               </div>
@@ -287,10 +313,10 @@ export default function TransferPage() {
 
               <div className="p-3 bg-muted rounded-lg">
                 <p className="font-medium">
-                  {studentOptions.find(s => s.registeredUserId === selectedStudent)?.name}
+                  {selectedStudentInfo?.name}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  ({studentOptions.find(s => s.registeredUserId === selectedStudent)?.number})
+                  학번: {selectedStudentInfo?.number}
                 </p>
               </div>
             </div>
@@ -306,14 +332,15 @@ export default function TransferPage() {
               />
             </div>
 
-            <div className="flex justify-end gap-2">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2">
               <Button
                 variant="outline"
                 onClick={() => setIsTransferDialogOpen(false)}
+                className="w-full sm:w-auto"
               >
                 취소
               </Button>
-              <Button onClick={handleTransfer}>
+              <Button onClick={handleTransfer} className="w-full sm:w-auto">
                 양도하기
               </Button>
             </div>

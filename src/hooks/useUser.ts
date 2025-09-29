@@ -62,33 +62,82 @@ export function useUser() {
 
   const signOut = async () => {
     try {
-      console.log('로그아웃 시작')
-      const { error } = await supabase.auth.signOut()
+      // 로컬 상태 즉시 클리어
+      setUser(null)
 
-      if (error) {
-        console.error('로그아웃 에러:', error)
-        throw error
+      // 브라우저 저장소 정리
+      if (typeof window !== 'undefined') {
+        // localStorage & sessionStorage 정리
+        localStorage.clear()
+        sessionStorage.clear()
+
+        // 쿠키 정리 (Supabase 인증 쿠키 포함)
+        const allCookies = document.cookie.split(';').filter(c => c.trim())
+        allCookies.forEach((cookie) => {
+          const name = cookie.split('=')[0].trim()
+          if (name) {
+            // 다양한 도메인/경로 조합으로 삭제
+            const domains = [window.location.hostname, `.${window.location.hostname}`]
+            const paths = ['/', '/auth', '/dashboard']
+
+            domains.forEach(domain => {
+              paths.forEach(path => {
+                document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=${path};domain=${domain}`
+                document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=${path}`
+              })
+            })
+            document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`
+          }
+        })
+
+        // IndexedDB 정리 (Supabase 관련)
+        try {
+          const databases = await indexedDB.databases()
+          const supabaseDbs = databases.filter(db =>
+            db.name?.includes('supabase') || db.name?.includes('auth') || db.name?.includes('sb-')
+          )
+
+          await Promise.allSettled(supabaseDbs.map(async (db) => {
+            if (db.name) {
+              await new Promise<void>((resolve) => {
+                const deleteReq = indexedDB.deleteDatabase(db.name!)
+                deleteReq.onsuccess = deleteReq.onerror = deleteReq.onblocked = () => resolve()
+              })
+            }
+          }))
+        } catch (error) {
+          console.warn('IndexedDB 정리 실패:', error)
+        }
       }
 
-      console.log('로그아웃 성공')
-      setUser(null) // 상태 즉시 클리어
+      // Supabase 로그아웃
+      await supabase.auth.signOut({ scope: 'global' })
+      await supabase.auth.signOut({ scope: 'local' })
+
       toast.success('로그아웃되었습니다.')
 
-      // 로그아웃 후 인증 페이지로 리디렉션
-      router.push('/auth')
-
-      // 페이지 강제 새로고침 (캐시 문제 방지)
-      setTimeout(() => {
-        window.location.href = '/auth'
-      }, 100)
+      // /auth로 리디렉션
+      if (typeof window !== 'undefined') {
+        window.location.replace('/auth')
+      } else {
+        router.push('/auth')
+      }
 
     } catch (error) {
-      console.error('로그아웃 중 오류가 발생했습니다:', error)
-      toast.error('로그아웃 중 오류가 발생했습니다.')
+      console.error('로그아웃 중 오류:', error)
 
-      // 에러가 발생해도 강제로 인증 페이지로 이동
+      // 에러 발생시에도 강제 정리 및 이동
       setUser(null)
-      router.push('/auth')
+
+      if (typeof window !== 'undefined') {
+        localStorage.clear()
+        sessionStorage.clear()
+        window.location.replace('/auth')
+      } else {
+        router.push('/auth')
+      }
+
+      toast.error('로그아웃되었습니다.')
     }
   }
 

@@ -353,11 +353,11 @@ export default function ExchangePage() {
         </p>
       </div>
 
-      <div className="grid gap-6">
+      <div className="grid gap-6 lg:gap-8">
         {/* 학생 선택 */}
         <Card>
           <CardHeader>
-            <CardTitle>교환할 학생 선택</CardTitle>
+            <CardTitle className="text-lg md:text-xl">교환할 학생 선택</CardTitle>
           </CardHeader>
           <CardContent>
             <StudentSelectorNew
@@ -370,11 +370,11 @@ export default function ExchangePage() {
         </Card>
 
         {selectedStudent && (
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid lg:grid-cols-2 gap-6">
             {/* 내 케이스 */}
             <Card>
               <CardHeader>
-                <CardTitle>내 케이스</CardTitle>
+                <CardTitle className="text-lg">내 케이스</CardTitle>
               </CardHeader>
               <CardContent>
                 {myCases.length === 0 ? (
@@ -417,7 +417,7 @@ export default function ExchangePage() {
             {/* 상대방 케이스 */}
             <Card>
               <CardHeader>
-                <CardTitle>
+                <CardTitle className="text-lg">
                   선택된 학생의 케이스
                 </CardTitle>
               </CardHeader>
@@ -465,13 +465,13 @@ export default function ExchangePage() {
         {selectedMyCase && selectedTheirCase && (
           <Card>
             <CardContent className="pt-6">
-              <div className="flex items-center justify-center space-x-4">
+              <div className="flex flex-col md:flex-row items-center justify-center gap-4">
                 <div className="text-center">
                   <p className="font-medium">{selectedMyCase.patient_name}</p>
                   <p className="text-sm text-muted-foreground">{selectedMyCase.category}</p>
                 </div>
 
-                <RefreshCcw className="h-6 w-6 text-muted-foreground" />
+                <RefreshCcw className="h-6 w-6 text-muted-foreground flex-shrink-0" />
 
                 <div className="text-center">
                   <p className="font-medium">{selectedTheirCase.patient_name}</p>
@@ -479,8 +479,12 @@ export default function ExchangePage() {
                 </div>
               </div>
 
-              <div className="mt-4 flex justify-center">
-                <Button onClick={() => setIsExchangeDialogOpen(true)}>
+              <div className="mt-6 flex justify-center">
+                <Button
+                  onClick={() => setIsExchangeDialogOpen(true)}
+                  className="w-full md:w-auto"
+                  size="lg"
+                >
                   케이스 교환하기
                 </Button>
               </div>
@@ -518,14 +522,15 @@ export default function ExchangePage() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-2">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2">
               <Button
                 variant="outline"
                 onClick={() => setIsExchangeDialogOpen(false)}
+                className="w-full sm:w-auto"
               >
                 취소
               </Button>
-              <Button onClick={handleExchange}>
+              <Button onClick={handleExchange} className="w-full sm:w-auto">
                 교환하기
               </Button>
             </div>

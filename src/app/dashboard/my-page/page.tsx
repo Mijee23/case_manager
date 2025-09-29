@@ -106,13 +106,13 @@ export default function MyPage() {
         </p>
       </div>
 
-      <div className="grid gap-6">
+      <div className="grid gap-6 lg:gap-8">
         <Card>
           <CardHeader>
-            <CardTitle>기본 정보</CardTitle>
+            <CardTitle className="text-lg md:text-xl">기본 정보</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="grid gap-4">
+            <div className="grid gap-4 md:gap-6">
               <div className="grid gap-2">
                 <Label>이메일</Label>
                 <Input value={user.email} disabled />
@@ -139,10 +139,10 @@ export default function MyPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>수정 가능한 정보</CardTitle>
+            <CardTitle className="text-lg md:text-xl">수정 가능한 정보</CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleUpdateProfile} className="space-y-4">
+            <form onSubmit={handleUpdateProfile} className="space-y-4 md:space-y-6">
               <div className="grid gap-2">
                 <Label htmlFor="number">번호</Label>
                 <Input
@@ -153,6 +153,7 @@ export default function MyPage() {
                   }
                   placeholder="학번 또는 번호"
                   required
+                  className="text-base"
                 />
               </div>
 
@@ -166,10 +167,16 @@ export default function MyPage() {
                   }
                   placeholder="이름"
                   required
+                  className="text-base"
                 />
               </div>
 
-              <Button type="submit" disabled={isLoading}>
+              <Button
+                type="submit"
+                disabled={isLoading}
+                className="w-full md:w-auto"
+                size="lg"
+              >
                 {isLoading ? '업데이트 중...' : '프로필 업데이트'}
               </Button>
             </form>
@@ -178,10 +185,10 @@ export default function MyPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>비밀번호 변경</CardTitle>
+            <CardTitle className="text-lg md:text-xl">비밀번호 변경</CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handlePasswordChange} className="space-y-4">
+            <form onSubmit={handlePasswordChange} className="space-y-4 md:space-y-6">
               <div className="grid gap-2">
                 <Label htmlFor="newPassword">새 비밀번호</Label>
                 <Input
@@ -193,6 +200,7 @@ export default function MyPage() {
                   }
                   placeholder="새 비밀번호 (최소 6자)"
                   required
+                  className="text-base"
                 />
               </div>
 
@@ -207,10 +215,17 @@ export default function MyPage() {
                   }
                   placeholder="새 비밀번호 확인"
                   required
+                  className="text-base"
                 />
               </div>
 
-              <Button type="submit" disabled={isLoading} variant="outline">
+              <Button
+                type="submit"
+                disabled={isLoading}
+                variant="outline"
+                className="w-full md:w-auto"
+                size="lg"
+              >
                 {isLoading ? '변경 중...' : '비밀번호 변경'}
               </Button>
             </form>

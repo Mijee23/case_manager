@@ -5,7 +5,7 @@ import { createSupabaseClient } from '@/lib/supabase'
 import { useUser } from '@/hooks/useUser'
 import { Case } from '@/types/database'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { ResponsiveTable, ResponsiveTableHeader, ResponsiveTableBody, ResponsiveTableRow, ResponsiveTableHead, ResponsiveTableCell } from '@/components/ui/responsive-table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -291,78 +291,89 @@ export default function MyCasesPage() {
                     {category} 케이스가 없습니다.
                   </p>
                 ) : (
-                  <div className="rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>일시</TableHead>
-                          <TableHead>담당 전공의</TableHead>
-                          <TableHead>환자명</TableHead>
-                          <TableHead>배정 학생 1</TableHead>
-                          <TableHead>배정 학생 2</TableHead>
-                          <TableHead>상태</TableHead>
-                          <TableHead>획득경로</TableHead>
-                          <TableHead>작업</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {categoryCases.map(case_ => (
-                          <TableRow key={case_.id}>
-                            <TableCell>
-                              {format(new Date(case_.datetime), 'MM/dd HH:mm', { locale: ko })}
-                            </TableCell>
-                            <TableCell>{case_.assigned_resident}</TableCell>
-                            <TableCell>{case_.patient_name}</TableCell>
-                            <TableCell>
-                              {(case_ as any).student1 ? 
-                                `${(case_ as any).student1.name} (${(case_ as any).student1.number})` : 
-                                '-'
-                              }
-                            </TableCell>
-                            <TableCell>
-                              {(case_ as any).student2 ? 
-                                `${(case_ as any).student2.name} (${(case_ as any).student2.number})` : 
-                                '-'
-                              }
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={getStatusBadgeVariant(case_.case_status)}>
-                                {case_.case_status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="secondary">{case_.acquisition_method}</Badge>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => {
-                                    setSelectedCase(case_)
-                                    setIsViewDialogOpen(true)
-                                  }}
-                                >
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => {
-                                    setSelectedCase(case_)
-                                    setStatusUpdate({ status: case_.case_status, reason: '' })
-                                    setIsStatusDialogOpen(true)
-                                  }}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+                  <ResponsiveTable>
+                    <ResponsiveTableHeader>
+                      <tr>
+                        <ResponsiveTableHead>일시</ResponsiveTableHead>
+                        <ResponsiveTableHead>담당 전공의</ResponsiveTableHead>
+                        <ResponsiveTableHead>환자명</ResponsiveTableHead>
+                        <ResponsiveTableHead>배정 학생 1</ResponsiveTableHead>
+                        <ResponsiveTableHead>배정 학생 2</ResponsiveTableHead>
+                        <ResponsiveTableHead>상태</ResponsiveTableHead>
+                        <ResponsiveTableHead>획득경로</ResponsiveTableHead>
+                        <ResponsiveTableHead>작업</ResponsiveTableHead>
+                      </tr>
+                    </ResponsiveTableHeader>
+                    <ResponsiveTableBody>
+                      {categoryCases.map(case_ => (
+                        <ResponsiveTableRow key={case_.id}>
+                          <ResponsiveTableCell label="일시">
+                            {format(new Date(case_.datetime), 'MM/dd HH:mm', { locale: ko })}
+                          </ResponsiveTableCell>
+                          <ResponsiveTableCell label="담당 전공의">
+                            {case_.assigned_resident}
+                          </ResponsiveTableCell>
+                          <ResponsiveTableCell label="환자명">
+                            <div>
+                              <p className="font-medium">{case_.patient_name}</p>
+                              <p className="text-xs text-muted-foreground">{case_.patient_number}</p>
+                            </div>
+                          </ResponsiveTableCell>
+                          <ResponsiveTableCell label="학생 1" hideOnMobile={true}>
+                            {(case_ as any).student1 ?
+                              `${(case_ as any).student1.name} (${(case_ as any).student1.number})` :
+                              '-'
+                            }
+                          </ResponsiveTableCell>
+                          <ResponsiveTableCell label="학생 2" hideOnMobile={true}>
+                            {(case_ as any).student2 ?
+                              `${(case_ as any).student2.name} (${(case_ as any).student2.number})` :
+                              '-'
+                            }
+                          </ResponsiveTableCell>
+                          <ResponsiveTableCell label="상태">
+                            <Badge variant={getStatusBadgeVariant(case_.case_status)}>
+                              {case_.case_status}
+                            </Badge>
+                          </ResponsiveTableCell>
+                          <ResponsiveTableCell label="획득경로" hideOnMobile={true}>
+                            <Badge variant="secondary" className="text-xs">
+                              {case_.acquisition_method}
+                            </Badge>
+                          </ResponsiveTableCell>
+                          <ResponsiveTableCell label="작업">
+                            <div className="flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setSelectedCase(case_)
+                                  setIsViewDialogOpen(true)
+                                }}
+                                className="flex-1 md:flex-none"
+                              >
+                                <Eye className="h-4 w-4" />
+                                <span className="md:hidden ml-1">보기</span>
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setSelectedCase(case_)
+                                  setStatusUpdate({ status: case_.case_status, reason: '' })
+                                  setIsStatusDialogOpen(true)
+                                }}
+                                className="flex-1 md:flex-none"
+                              >
+                                <Edit className="h-4 w-4" />
+                                <span className="md:hidden ml-1">수정</span>
+                              </Button>
+                            </div>
+                          </ResponsiveTableCell>
+                        </ResponsiveTableRow>
+                      ))}
+                    </ResponsiveTableBody>
+                  </ResponsiveTable>
                 )}
               </CardContent>
             </Card>
