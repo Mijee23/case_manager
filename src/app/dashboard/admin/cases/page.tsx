@@ -12,10 +12,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Search, Edit, Save, X, Eye } from 'lucide-react'
+import { Search, Edit, Eye } from 'lucide-react'
 import { format } from 'date-fns'
 import { ko } from 'date-fns/locale'
-import StudentSelectorNew from '@/components/StudentSelectorNew'
 
 interface Case {
   id: string
@@ -43,12 +42,10 @@ export default function AdminCasesPage() {
   const { user } = useUser()
   const [cases, setCases] = useState<Case[]>([])
   const [students, setStudents] = useState<User[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState<Partial<Case>>({})
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [selectedCase, setSelectedCase] = useState<Case | null>(null)
@@ -58,25 +55,63 @@ export default function AdminCasesPage() {
   const supabase = createSupabaseClient()
 
   useEffect(() => {
-    if (user?.role === '관리자') {
-      fetchCases()
-      fetchStudents()
-    }
-  }, [user])
+    // 페이지 로드 시 즉시 데이터 fetch 시작
+    setLoading(true)
+    Promise.all([fetchCases(true), fetchStudents()])
+      .finally(() => {
+        setLoading(false)
+      })
 
-  const fetchCases = async () => {
+    // 뒤로가기/앞으로가기 이벤트 처리
+    const handlePopState = () => {
+      // 페이지 상태 복원
+      if (document.visibilityState === 'visible') {
+        Promise.all([fetchCases(true), fetchStudents()])
+      }
+    }
+
+    // 페이지 가시성 변경 이벤트 처리 (탭 전환 등)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        Promise.all([fetchCases(true), fetchStudents()])
+      }
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [])
+
+  const fetchCases = async (keepLoadingState = false) => {
     try {
+      if (!keepLoadingState) {
+        setLoading(true)
+      }
+
       const { data, error } = await supabase
         .from('cases')
         .select('*')
         .order('datetime', { ascending: false })
 
-      if (error) throw error
+      if (error) {
+        console.error('Supabase error fetching cases:', error)
+        throw error
+      }
+
       setCases(data || [])
     } catch (error) {
       console.error('Error fetching cases:', error)
+      // 에러 발생 시 빈 배열로 설정하여 UI가 정상적으로 렌더링되도록 함
+      setCases([])
     } finally {
-      setLoading(false)
+      // keepLoadingState가 true가 아닌 경우에만 로딩 해제
+      if (!keepLoadingState) {
+        setLoading(false)
+      }
     }
   }
 
@@ -88,20 +123,20 @@ export default function AdminCasesPage() {
         .eq('role', '학생')
         .order('name')
 
-      if (error) throw error
+      if (error) {
+        console.error('Supabase error fetching students:', error)
+        throw error
+      }
+
       setStudents(data || [])
     } catch (error) {
       console.error('Error fetching students:', error)
+      // 에러 발생 시 빈 배열로 설정하여 UI가 정상적으로 렌더링되도록 함
+      setStudents([])
     }
   }
 
-  // 기존 인라인 편집을 위한 handleEdit (유지)
-  const handleInlineEdit = (caseItem: Case) => {
-    setEditingId(caseItem.id)
-    setEditForm(caseItem)
-  }
-
-  // 팝업 편집을 위한 새로운 handleEdit
+  // 케이스 수정 다이얼로그 열기
   const handleEdit = (caseItem: Case) => {
     setEditingCase(caseItem)
     setIsEditDialogOpen(true)
@@ -136,8 +171,15 @@ export default function AdminCasesPage() {
 
       if (error) throw error
 
-      // 케이스 목록 새로고침
-      await fetchCases()
+      // 로컬 state 직접 업데이트 (서버 재요청 없이)
+      setCases(prevCases =>
+        prevCases.map(c =>
+          c.id === editingCase.id
+            ? { ...c, ...updateData }
+            : c
+        )
+      )
+
       setIsEditDialogOpen(false)
       setEditingCase(null)
 
@@ -152,33 +194,6 @@ export default function AdminCasesPage() {
     }
   }
 
-  const handleSave = async () => {
-    if (!editingId) return
-
-    try {
-      const { error } = await supabase
-        .from('cases')
-        .update(editForm)
-        .eq('id', editingId)
-
-      if (error) throw error
-
-      setCases(cases.map(c =>
-        c.id === editingId ? { ...c, ...editForm } as Case : c
-      ))
-
-      setEditingId(null)
-      setEditForm({})
-    } catch (error) {
-      console.error('Error updating case:', error)
-      alert('케이스 수정 중 오류가 발생했습니다.')
-    }
-  }
-
-  const handleCancel = () => {
-    setEditingId(null)
-    setEditForm({})
-  }
 
   const filteredCases = cases.filter(caseItem => {
     const matchesSearch =
@@ -249,11 +264,20 @@ export default function AdminCasesPage() {
     }
   }
 
+  // 데이터 로딩 중인 경우
   if (loading) {
-    return <div>로딩 중...</div>
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">케이스 데이터를 불러오고 있습니다...</p>
+        </div>
+      </div>
+    )
   }
 
-  if (!user || user.role !== '관리자') {
+  // 관리자가 아닌 경우 (로딩 완료 후 체크)
+  if (user && user.role !== '관리자') {
     return (
       <div className="text-center py-8">
         <p className="text-muted-foreground">관리자 권한이 필요합니다.</p>
@@ -344,58 +368,17 @@ export default function AdminCasesPage() {
                       }}
                     >
                       <TableCell>
-                        {editingId === caseItem.id ? (
-                          <Input
-                            type="datetime-local"
-                            value={editForm.datetime || ''}
-                            onChange={(e) => setEditForm({...editForm, datetime: e.target.value})}
-                            className="w-full"
-                          />
-                        ) : (
-                          format(new Date(caseItem.datetime), 'MM/dd HH:mm', { locale: ko })
-                        )}
+                        {format(new Date(caseItem.datetime), 'MM/dd HH:mm', { locale: ko })}
                       </TableCell>
                       <TableCell>
-                        {editingId === caseItem.id ? (
-                          <Select
-                            value={editForm.category || ''}
-                            onValueChange={(value) => setEditForm({...editForm, category: value})}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="가철">가철</SelectItem>
-                              <SelectItem value="고정">고정</SelectItem>
-                              <SelectItem value="임플">임플</SelectItem>
-                              <SelectItem value="임수">임수</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <Badge variant="outline">{caseItem.category}</Badge>
-                        )}
+                        <Badge variant="outline">{caseItem.category}</Badge>
                       </TableCell>
                       <TableCell>{caseItem.patient_number}</TableCell>
                       <TableCell>
-                        {editingId === caseItem.id ? (
-                          <Input
-                            placeholder="환자이름"
-                            value={editForm.patient_name || ''}
-                            onChange={(e) => setEditForm({...editForm, patient_name: e.target.value})}
-                          />
-                        ) : (
-                          caseItem.patient_name
-                        )}
+                        {caseItem.patient_name}
                       </TableCell>
                       <TableCell>
-                        {editingId === caseItem.id ? (
-                          <Input
-                            value={editForm.assigned_resident || ''}
-                            onChange={(e) => setEditForm({...editForm, assigned_resident: e.target.value})}
-                          />
-                        ) : (
-                          caseItem.assigned_resident
-                        )}
+                        {caseItem.assigned_resident}
                       </TableCell>
                       <TableCell>
                         <div className="space-y-1 text-sm">
@@ -406,25 +389,9 @@ export default function AdminCasesPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {editingId === caseItem.id ? (
-                          <Select
-                            value={editForm.case_status || ''}
-                            onValueChange={(value) => setEditForm({...editForm, case_status: value})}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="완료">완료</SelectItem>
-                              <SelectItem value="실패">실패</SelectItem>
-                              <SelectItem value="진행중">진행중</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <Badge variant={getStatusBadgeVariant(caseItem.case_status)}>
-                            {caseItem.case_status}
-                          </Badge>
-                        )}
+                        <Badge variant={getStatusBadgeVariant(caseItem.case_status)}>
+                          {caseItem.case_status}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <Badge variant="secondary">{caseItem.acquisition_method}</Badge>
@@ -442,27 +409,16 @@ export default function AdminCasesPage() {
                           >
                             <Eye className="h-3 w-3" />
                           </Button>
-                          {editingId === caseItem.id ? (
-                            <>
-                              <Button size="sm" onClick={handleSave}>
-                                <Save className="h-3 w-3" />
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={handleCancel}>
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleEdit(caseItem)
-                              }}
-                            >
-                              <Edit className="h-3 w-3" />
-                            </Button>
-                          )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleEdit(caseItem)
+                            }}
+                          >
+                            <Edit className="h-3 w-3" />
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -635,23 +591,39 @@ export default function AdminCasesPage() {
                   />
                 </div>
 
-                <StudentSelectorNew
-                  label="배정 학생 1"
-                  name="assigned_student1"
-                  defaultValue={editingCase.assigned_student1 || 'none'}
-                  placeholder="학생을 선택하세요"
-                  allowNone={true}
-                  noneLabel="선택 안함"
-                />
+                <div className="space-y-2">
+                  <Label htmlFor="assigned_student1">배정 학생 1</Label>
+                  <Select name="assigned_student1" defaultValue={editingCase.assigned_student1 || 'none'}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="학생을 선택하세요" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">선택 안함</SelectItem>
+                      {students.map((student) => (
+                        <SelectItem key={student.id} value={student.id}>
+                          {student.name}({student.number})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-                <StudentSelectorNew
-                  label="배정 학생 2"
-                  name="assigned_student2"
-                  defaultValue={editingCase.assigned_student2 || 'none'}
-                  placeholder="학생을 선택하세요"
-                  allowNone={true}
-                  noneLabel="선택 안함"
-                />
+                <div className="space-y-2">
+                  <Label htmlFor="assigned_student2">배정 학생 2</Label>
+                  <Select name="assigned_student2" defaultValue={editingCase.assigned_student2 || 'none'}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="학생을 선택하세요" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">선택 안함</SelectItem>
+                      {students.map((student) => (
+                        <SelectItem key={student.id} value={student.id}>
+                          {student.name}({student.number})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="case_status">상태</Label>

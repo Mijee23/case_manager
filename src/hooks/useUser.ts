@@ -9,28 +9,43 @@ import { toast } from 'sonner'
 export function useUser() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [initialized, setInitialized] = useState(false)
   const supabase = createSupabaseClient()
   const router = useRouter()
 
   useEffect(() => {
+    if (initialized) return // 이미 초기화된 경우 재실행 방지
+
     const getUser = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
 
-      if (session?.user) {
-        const { data: userData } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', session.user.id)
-          .single()
+        if (session?.user) {
+          // 세션이 있으면 사용자 데이터 조회
+          const { data: userData, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', session.user.id)
+            .single()
 
-        if (userData) {
-          setUser(userData)
+          if (error) {
+            console.warn('사용자 데이터 조회 실패:', error)
+            setUser(null)
+          } else if (userData) {
+            setUser(userData)
+          }
+        } else {
+          setUser(null)
         }
+      } catch (error) {
+        console.warn('인증 확인 중 오류:', error)
+        setUser(null)
+      } finally {
+        setLoading(false)
+        setInitialized(true)
       }
-
-      setLoading(false)
     }
 
     getUser()
@@ -38,15 +53,25 @@ export function useUser() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        const { data: userData } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', session.user.id)
-          .single()
+      console.log('인증 상태 변경:', event, session?.user?.id)
 
-        if (userData) {
-          setUser(userData)
+      if (event === 'SIGNED_IN' && session?.user) {
+        try {
+          const { data: userData, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', session.user.id)
+            .single()
+
+          if (error) {
+            console.warn('로그인 후 사용자 데이터 조회 실패:', error)
+            setUser(null)
+          } else if (userData) {
+            setUser(userData)
+          }
+        } catch (error) {
+          console.warn('로그인 처리 중 오류:', error)
+          setUser(null)
         }
       } else if (event === 'SIGNED_OUT') {
         setUser(null)
@@ -58,7 +83,7 @@ export function useUser() {
     return () => {
       subscription.unsubscribe()
     }
-  }, [supabase])
+  }, [supabase, initialized])
 
   const signOut = async () => {
     try {

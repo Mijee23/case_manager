@@ -22,15 +22,41 @@ interface ChartingStats {
 export default function ChartingStatsPage() {
   const { user } = useUser()
   const [stats, setStats] = useState<ChartingStats | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
 
   const supabase = createSupabaseClient()
 
   useEffect(() => {
-    if (user?.role === '관리자') {
-      fetchChartingStats()
+    // 페이지 로드 시 즉시 데이터 fetch 시작
+    setLoading(true)
+    fetchChartingStats()
+      .finally(() => {
+        setLoading(false)
+      })
+
+    // 뒤로가기/앞으로가기 이벤트 처리
+    const handlePopState = () => {
+      // 페이지 상태 복원
+      if (document.visibilityState === 'visible') {
+        fetchChartingStats()
+      }
     }
-  }, [user])
+
+    // 페이지 가시성 변경 이벤트 처리 (탭 전환 등)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchChartingStats()
+      }
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [])
 
   const fetchChartingStats = async () => {
     try {
@@ -128,8 +154,16 @@ export default function ChartingStatsPage() {
     } catch (error) {
       console.error('Error fetching charting stats:', error)
       toast.error('차팅 통계를 불러오는 중 오류가 발생했습니다.')
-    } finally {
-      setLoading(false)
+      // 에러 발생 시 빈 통계로 설정
+      setStats({
+        chartingDistribution: [],
+        diagnosisDistribution: [],
+        studentCount: 0,
+        totalCharting: 0,
+        totalDiagnosis: 0,
+        averageCharting: 0,
+        averageDiagnosis: 0,
+      })
     }
   }
 
@@ -166,11 +200,20 @@ export default function ChartingStatsPage() {
     )
   }
 
+  // 데이터 로딩 중인 경우
   if (loading) {
-    return <div>로딩 중...</div>
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">차팅 통계 데이터를 불러오고 있습니다...</p>
+        </div>
+      </div>
+    )
   }
 
-  if (!user || user.role !== '관리자') {
+  // 관리자가 아닌 경우 (로딩 완료 후 체크)
+  if (user && user.role !== '관리자') {
     return (
       <div className="text-center py-8">
         <p className="text-muted-foreground">관리자 권한이 필요합니다.</p>

@@ -21,7 +21,7 @@ import { Shield, Edit, RotateCcw, RefreshCw } from 'lucide-react'
 export default function UsersManagementPage() {
   const { user: currentUser } = useUser()
   const [users, setUsers] = useState<User[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isPasswordResetDialogOpen, setIsPasswordResetDialogOpen] = useState(false)
@@ -35,34 +35,56 @@ export default function UsersManagementPage() {
   const supabase = createSupabaseClient()
 
   useEffect(() => {
-    if (currentUser?.role === '관리자') {
-      fetchUsers()
-      
-      // 실시간 구독 설정
-      const subscription = supabase
-        .channel('users_changes')
-        .on('postgres_changes', 
-          { 
-            event: '*', 
-            schema: 'public', 
-            table: 'users' 
-          }, 
-          (payload: any) => {
-            console.log('사용자 테이블 변경 감지:', payload)
-            fetchUsers() // 변경 감지 시 목록 새로고침
-          }
-        )
-        .subscribe()
+    // 페이지 로드 시 즉시 데이터 fetch 시작
+    setLoading(true)
+    fetchUsers()
+      .finally(() => {
+        setLoading(false)
+      })
 
-      return () => {
-        subscription.unsubscribe()
+    // 실시간 구독 설정
+    const subscription = supabase
+      .channel('users_changes')
+      .on('postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'users'
+        },
+        (payload: any) => {
+          console.log('사용자 테이블 변경 감지:', payload)
+          fetchUsers() // 변경 감지 시 목록 새로고침
+        }
+      )
+      .subscribe()
+
+    // 뒤로가기/앞으로가기 이벤트 처리
+    const handlePopState = () => {
+      // 페이지 상태 복원
+      if (document.visibilityState === 'visible') {
+        fetchUsers()
       }
     }
-  }, [currentUser])
+
+    // 페이지 가시성 변경 이벤트 처리 (탭 전환 등)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchUsers()
+      }
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      subscription.unsubscribe()
+      window.removeEventListener('popstate', handlePopState)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [])
 
   const fetchUsers = async (showToast = false) => {
     try {
-      setLoading(true)
       
       // 현재 사용자 정보 로그
       console.log('현재 사용자:', currentUser)
@@ -216,16 +238,25 @@ export default function UsersManagementPage() {
     return count || 0
   }
 
-  if (!currentUser || currentUser.role !== '관리자') {
+  // 데이터 로딩 중인 경우
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">사용자 데이터를 불러오고 있습니다...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // 관리자가 아닌 경우 (로딩 완료 후 체크)
+  if (currentUser && currentUser.role !== '관리자') {
     return (
       <div className="text-center py-8">
         <p className="text-muted-foreground">관리자 권한이 필요합니다.</p>
       </div>
     )
-  }
-
-  if (loading) {
-    return <div>로딩 중...</div>
   }
 
   return (
@@ -283,6 +314,8 @@ export default function UsersManagementPage() {
                 ) : (
                   users.map((user) => (
                     <TableRow key={user.id}>
+                      <TableCell>{user.name}</TableCell>
+                      <TableCell>{user.number}</TableCell>
                       <TableCell>{user.email}</TableCell>
                       <TableCell>
                         <Badge variant={getRoleBadgeVariant(user.role)}>
@@ -308,7 +341,7 @@ export default function UsersManagementPage() {
                               size="sm"
                               variant="outline"
                               onClick={() => handlePasswordReset(user)}
-                              disabled={user.id === currentUser.id}
+                              disabled={user.id === currentUser?.id}
                             >
                               <RotateCcw className="h-4 w-4" />
                             </Button>

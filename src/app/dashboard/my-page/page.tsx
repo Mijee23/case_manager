@@ -11,7 +11,7 @@ import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
 
 export default function MyPage() {
-  const { user } = useUser()
+  const { user, loading: userLoading } = useUser()
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
     number: '',
@@ -95,7 +95,26 @@ export default function MyPage() {
     }
   }
 
-  if (!user) return null
+  // user가 아직 로딩 중인 경우
+  if (userLoading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">사용자 정보를 불러오고 있습니다...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // 로딩 완료 후 user가 없는 경우 (인증 실패)
+  if (!user) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-muted-foreground">사용자 정보를 확인할 수 없습니다.</p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
