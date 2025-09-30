@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createSupabaseClient } from '@/lib/supabase'
+import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -19,6 +20,7 @@ export function AuthForm() {
   const [successMessage, setSuccessMessage] = useState('')
   const router = useRouter()
   const supabase = createSupabaseClient()
+  const { updateUserAfterLogin } = useAuth()
 
   const handleSignIn = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -68,7 +70,12 @@ export function AuthForm() {
         return
       }
 
-      console.log('로그인 성공, 대시보드로 이동')
+      console.log('로그인 성공, 사용자 정보 업데이트 후 대시보드로 이동')
+
+      // AuthContext 사용자 상태 업데이트
+      await updateUserAfterLogin()
+
+      // 대시보드로 이동
       router.push('/dashboard')
     } catch (error) {
       console.error('로그인 예외:', error)
@@ -126,11 +133,12 @@ export function AuthForm() {
           }
         }
 
-        console.log(`${role} 로그인 성공, 대시보드로 이동`)
-        
-        // 캐시 무효화 (기존 계정 로그인이지만 혹시 모를 상황 대비)
-        // invalidateStudentsCache() // 제거됨
-        
+        console.log(`${role} 로그인 성공, 사용자 정보 업데이트 후 대시보드로 이동`)
+
+        // AuthContext 사용자 상태 업데이트
+        await updateUserAfterLogin()
+
+        // 대시보드로 이동
         router.push('/dashboard')
         return
       }
@@ -216,11 +224,12 @@ export function AuthForm() {
             return
           }
 
-          console.log(`${role} 계정 생성 및 로그인 성공, 대시보드로 이동`)
-          
-          // 학생이 아닌 경우에도 캐시 무효화 (관리자/전공의 추가로 인한 ID 변경 가능성)
-          // invalidateStudentsCache() // 제거됨
-          
+          console.log(`${role} 계정 생성 및 로그인 성공, 사용자 정보 업데이트 후 대시보드로 이동`)
+
+          // AuthContext 사용자 상태 업데이트
+          await updateUserAfterLogin()
+
+          // 대시보드로 이동
           router.push('/dashboard')
           return
         }

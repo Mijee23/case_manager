@@ -4,16 +4,17 @@ import React, { createContext, useContext, useEffect, useState, ReactNode } from
 import { createSupabaseClient } from '@/lib/supabase'
 import { User } from '@/types/database'
 import { useRouter } from 'next/navigation'
-import { usePageFocus } from '@/hooks/usePageFocus'
 import { toast } from 'sonner'
 
 interface AuthContextType {
   user: User | null
   loading: boolean
   error: string | null
+  initialized: boolean
   signOut: () => Promise<void>
   retry: () => void
   softRetry: () => Promise<void>
+  updateUserAfterLogin: () => Promise<void>
   isAuthenticated: boolean
 }
 
@@ -33,7 +34,7 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [initialized, setInitialized] = useState(false)
   const supabase = createSupabaseClient()
@@ -62,220 +63,40 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
-  const initializeAuth = async (forceRefresh = false) => {
-    try {
-      setLoading(true)
-      setError(null)
 
-      const timeoutId = setTimeout(() => {
-        console.warn('인증 초기화 타임아웃')
-        setError('인증 확인 중 시간이 초과되었습니다.')
-        setLoading(false)
-        setInitialized(true)
-      }, 5000)
-
-      // 강제 새로고침인 경우 세션을 다시 가져옴
-      if (forceRefresh) {
-        await supabase.auth.refreshSession()
-      }
-
-      const {
-        data: { session },
-        error: sessionError
-      } = await supabase.auth.getSession()
-
-      clearTimeout(timeoutId)
-
-      if (sessionError) {
-        console.warn('세션 조회 에러:', sessionError)
-        // 세션 에러 시 로컬 상태 정리
-        await cleanupAuthState()
-        setUser(null)
-        return
-      }
-
-      if (session?.user) {
-        // 세션이 유효한지 추가 검증
-        const isSessionValid = await validateSession(session)
-        if (isSessionValid) {
-          const userData = await fetchUserData(session.user.id)
-          setUser(userData)
-        } else {
-          console.warn('세션이 유효하지 않음')
-          await cleanupAuthState()
-          setUser(null)
-        }
-      } else {
-        setUser(null)
-      }
-    } catch (error) {
-      console.warn('인증 초기화 중 오류:', error)
-      setError('인증 확인 중 오류가 발생했습니다.')
-      setUser(null)
-    } finally {
-      setLoading(false)
-      setInitialized(true)
-    }
-  }
-
-  // 세션 유효성 검증
-  const validateSession = async (session: any): Promise<boolean> => {
-    try {
-      // 현재 시간과 세션 만료 시간 비교
-      const now = Date.now() / 1000
-      if (session.expires_at && session.expires_at < now) {
-        console.warn('세션이 만료됨')
-        return false
-      }
-
-      // 서버에서 실제 사용자 정보를 조회해서 세션 유효성 확인
-      const { data, error } = await supabase
-        .from('users')
-        .select('id')
-        .eq('id', session.user.id)
-        .single()
-
-      if (error || !data) {
-        console.warn('사용자 검증 실패:', error)
-        return false
-      }
-
-      return true
-    } catch (error) {
-      console.warn('세션 검증 중 오류:', error)
-      return false
-    }
-  }
-
-  // 인증 상태 정리
-  const cleanupAuthState = async () => {
-    try {
-      // Supabase 세션 정리
-      await supabase.auth.signOut({ scope: 'local' })
-
-      // 로컬 스토리지 정리
-      if (typeof window !== 'undefined') {
-        const authKeys = Object.keys(localStorage).filter(key =>
-          key.includes('supabase') || key.includes('sb-')
-        )
-        authKeys.forEach(key => localStorage.removeItem(key))
-      }
-    } catch (error) {
-      console.warn('인증 상태 정리 중 오류:', error)
-    }
-  }
-
-  usePageFocus(() => {
-    if (initialized && !loading && !user) {
-      console.log('페이지 포커스 시 인증 재확인')
-      initializeAuth(true) // 강제 새로고침
-    }
-  })
 
   useEffect(() => {
     let mounted = true
 
-    // 브라우저 새로고침 감지 및 처리
-    const handlePageShow = (event: PageTransitionEvent) => {
-      if (event.persisted) {
-        // bfcache에서 복원된 경우 - 강제 인증 재확인
-        console.log('bfcache에서 페이지 복원됨, 인증 재확인')
-        initializeAuth(true)
-      }
-    }
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && initialized) {
-        // 페이지가 다시 보이게 되었을 때 세션 검증
-        console.log('페이지 가시성 변경, 세션 검증')
-        validateCurrentSession()
-      }
-    }
-
-    // Performance API로 새로고침 감지
-    const handleLoad = () => {
-      if (performance.getEntriesByType('navigation')[0]?.type === 'reload') {
-        console.log('브라우저 새로고침 감지됨')
-        // 약간의 지연 후 강제 인증 재확인
-        setTimeout(() => {
-          if (mounted) {
-            initializeAuth(true)
-          }
-        }, 100)
-      }
-    }
-
-    // 세션 유효성 검증 (로딩 상태 없이)
-    const validateCurrentSession = async () => {
+    // 초기 세션 확인 (1회만)
+    const initializeOnce = async () => {
       try {
+        setError(null)
+
         const { data: { session } } = await supabase.auth.getSession()
 
-        if (session?.user) {
-          const isValid = await validateSession(session)
-          if (!isValid) {
-            console.log('현재 세션이 유효하지 않음, 정리')
-            await cleanupAuthState()
+        if (mounted) {
+          if (session?.user) {
+            const userData = await fetchUserData(session.user.id)
+            setUser(userData)
+          } else {
             setUser(null)
           }
+          setInitialized(true)
         }
       } catch (error) {
-        console.warn('세션 검증 중 오류:', error)
+        if (mounted) {
+          console.warn('초기 인증 확인 중 오류:', error)
+          setUser(null)
+          setInitialized(true)
+        }
       }
     }
 
-    // 이벤트 리스너 등록
-    window.addEventListener('pageshow', handlePageShow)
-    window.addEventListener('load', handleLoad)
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-
-    initializeAuth()
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return
-
-      console.log('인증 상태 변경:', event, session?.user?.id)
-
-      if (event === 'SIGNED_IN' && session?.user) {
-        setLoading(true)
-        setError(null)
-
-        const isValid = await validateSession(session)
-        if (isValid && mounted) {
-          const userData = await fetchUserData(session.user.id)
-          if (mounted) {
-            setUser(userData)
-            setLoading(false)
-          }
-        } else {
-          console.warn('로그인된 세션이 유효하지 않음')
-          await cleanupAuthState()
-          setUser(null)
-          setLoading(false)
-        }
-      } else if (event === 'SIGNED_OUT') {
-        setUser(null)
-        setError(null)
-        setLoading(false)
-      } else if (event === 'TOKEN_REFRESHED' && session?.user) {
-        console.log('토큰 갱신됨')
-        // 토큰 갱신 시에도 세션 유효성 검증
-        const isValid = await validateSession(session)
-        if (!isValid) {
-          console.warn('갱신된 토큰이 유효하지 않음')
-          await cleanupAuthState()
-          setUser(null)
-        }
-      }
-    })
+    initializeOnce()
 
     return () => {
       mounted = false
-      subscription.unsubscribe()
-      window.removeEventListener('pageshow', handlePageShow)
-      window.removeEventListener('load', handleLoad)
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [])
 
@@ -384,13 +205,30 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
+  // 로그인 성공 후 사용자 상태 업데이트
+  const updateUserAfterLogin = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (session?.user) {
+        const userData = await fetchUserData(session.user.id)
+        setUser(userData)
+        setError(null)
+      }
+    } catch (error) {
+      console.warn('로그인 후 사용자 정보 업데이트 실패:', error)
+    }
+  }
+
   const value = {
     user,
     loading,
     error,
+    initialized,
     signOut,
     retry,
     softRetry,
+    updateUserAfterLogin,
     isAuthenticated: !!user && !loading && !error
   }
 

@@ -2,7 +2,6 @@
 
 import { ReactNode, useEffect, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { usePageFocus } from '@/hooks/usePageFocus'
 import { Button } from '@/components/ui/button'
 
 interface AuthGuardProps {
@@ -24,10 +23,6 @@ export function AuthGuard({
   const [dataLoading, setDataLoading] = useState(false)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
 
-  // 페이지 포커스 시 데이터 새로고침
-  usePageFocus(() => {
-    setRefreshTrigger(prev => prev + 1)
-  })
 
   // 사용자 인증 로딩 중인 경우
   if (userLoading) {
