@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { createSupabaseClient } from '@/lib/supabase'
-import { useUser } from '@/hooks/useUser'
 import { User } from '@/types/database'
+import { AuthGuard } from '@/components/auth/AuthGuard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
@@ -16,15 +16,19 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { ko } from 'date-fns/locale'
-import { Shield, Edit, RotateCcw, RefreshCw } from 'lucide-react'
+import { Shield, Edit, RotateCcw, RefreshCw, AlertTriangle } from 'lucide-react'
 
 export default function UsersManagementPage() {
-  const { user: currentUser } = useUser()
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(false)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isPasswordResetDialogOpen, setIsPasswordResetDialogOpen] = useState(false)
+
+  // 초기 데이터 로딩
+  useEffect(() => {
+    fetchUsers()
+  }, [])
   const [editFormData, setEditFormData] = useState({
     email: '',
     number: '',
@@ -34,61 +38,10 @@ export default function UsersManagementPage() {
 
   const supabase = createSupabaseClient()
 
-  useEffect(() => {
-    // 페이지 로드 시 즉시 데이터 fetch 시작
+
+  const fetchUsers = async (showToast = false, currentUser?: any) => {
     setLoading(true)
-    fetchUsers()
-      .finally(() => {
-        setLoading(false)
-      })
-
-    // 실시간 구독 설정
-    const subscription = supabase
-      .channel('users_changes')
-      .on('postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'users'
-        },
-        (payload: any) => {
-          console.log('사용자 테이블 변경 감지:', payload)
-          fetchUsers() // 변경 감지 시 목록 새로고침
-        }
-      )
-      .subscribe()
-
-    // 뒤로가기/앞으로가기 이벤트 처리
-    const handlePopState = () => {
-      // 페이지 상태 복원
-      if (document.visibilityState === 'visible') {
-        fetchUsers()
-      }
-    }
-
-    // 페이지 가시성 변경 이벤트 처리 (탭 전환 등)
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        fetchUsers()
-      }
-    }
-
-    window.addEventListener('popstate', handlePopState)
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-
-    return () => {
-      subscription.unsubscribe()
-      window.removeEventListener('popstate', handlePopState)
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-    }
-  }, [])
-
-  const fetchUsers = async (showToast = false) => {
     try {
-      
-      // 현재 사용자 정보 로그
-      console.log('현재 사용자:', currentUser)
-      
       // 관리자인 경우 API 엔드포인트를 통해 모든 사용자 조회
       if (currentUser?.role === '관리자') {
         try {
@@ -151,8 +104,8 @@ export default function UsersManagementPage() {
     }
   }
 
-  const handleRefresh = () => {
-    fetchUsers(true)
+  const handleRefresh = (currentUser?: any) => {
+    fetchUsers(true, currentUser)
   }
 
   const handleEditUser = (user: User) => {
@@ -238,226 +191,197 @@ export default function UsersManagementPage() {
     return count || 0
   }
 
-  // 데이터 로딩 중인 경우
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">사용자 데이터를 불러오고 있습니다...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // 관리자가 아닌 경우 (로딩 완료 후 체크)
-  if (currentUser && currentUser.role !== '관리자') {
-    return (
-      <div className="text-center py-8">
-        <p className="text-muted-foreground">관리자 권한이 필요합니다.</p>
-      </div>
-    )
-  }
-
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">사용자 관리</h1>
-        <p className="text-muted-foreground mt-2">
-          모든 사용자를 확인하고 관리할 수 있습니다.
-        </p>
-      </div>
-
-      <Alert>
-        <Shield className="h-4 w-4" />
-        <AlertDescription>
-          관리자 권한으로 사용자 정보 수정 및 비밀번호 초기화가 가능합니다.
-          비밀번호는 '1111'로 초기화됩니다.
-        </AlertDescription>
-      </Alert>
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>전체 사용자 목록 ({users.length}명)</CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRefresh}
-              disabled={loading}
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              새로고침
-            </Button>
+    <AuthGuard requiredRole="관리자">
+      {(currentUser: any) => (
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-3xl font-bold">사용자 관리</h1>
+            <p className="text-muted-foreground mt-2">
+              등록된 사용자들을 관리하고 권한을 설정할 수 있습니다.
+            </p>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>이름</TableHead>
-                  <TableHead>번호</TableHead>
-                  <TableHead>이메일</TableHead>
-                  <TableHead>역할</TableHead>
-                  <TableHead>가입일</TableHead>
-                  <TableHead>작업</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                      등록된 사용자가 없습니다.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  users.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell>{user.name}</TableCell>
-                      <TableCell>{user.number}</TableCell>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell>
-                        <Badge variant={getRoleBadgeVariant(user.role)}>
-                          {user.role}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {format(new Date(user.created_at), 'yyyy-MM-dd', { locale: ko })}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex space-x-2">
-                          {user.role === '학생' && (
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                사용자 목록 ({users.length}명)
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleRefresh(currentUser)}
+                disabled={loading}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                새로고침
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>이메일</TableHead>
+                      <TableHead>학번/번호</TableHead>
+                      <TableHead>이름</TableHead>
+                      <TableHead>역할</TableHead>
+                      <TableHead>등록일</TableHead>
+                      <TableHead className="text-right">작업</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {users.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell className="font-medium">{user.email}</TableCell>
+                        <TableCell>{user.number || '-'}</TableCell>
+                        <TableCell>{user.name}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              user.role === '관리자' ? 'default' :
+                              user.role === '전공의' ? 'secondary' : 'outline'
+                            }
+                          >
+                            {user.role}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {format(new Date(user.created_at), 'yyyy-MM-dd', { locale: ko })}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
                             <Button
-                              size="sm"
                               variant="outline"
+                              size="sm"
                               onClick={() => handleEditUser(user)}
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
-                          )}
-                          {user.role === '학생' && (
                             <Button
-                              size="sm"
                               variant="outline"
+                              size="sm"
                               onClick={() => handlePasswordReset(user)}
                               disabled={user.id === currentUser?.id}
                             >
                               <RotateCcw className="h-4 w-4" />
                             </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
 
-      {/* 사용자 편집 다이얼로그 */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>사용자 정보 수정</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-email">이메일</Label>
-              <Input
-                id="edit-email"
-                value={editFormData.email}
-                onChange={(e) => setEditFormData(prev => ({ ...prev, email: e.target.value }))}
-                placeholder="이메일"
-              />
-            </div>
+          {/* 사용자 수정 다이얼로그 */}
+          <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>사용자 정보 수정</DialogTitle>
+              </DialogHeader>
+              {selectedUser && (
+                <form onSubmit={handleUserUpdate} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">이메일</Label>
+                    <Input
+                      id="email"
+                      name="email"
+                      type="email"
+                      defaultValue={selectedUser.email}
+                      required
+                    />
+                  </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="edit-number">번호</Label>
-              <Input
-                id="edit-number"
-                value={editFormData.number}
-                onChange={(e) => setEditFormData(prev => ({ ...prev, number: e.target.value }))}
-                placeholder="번호"
-              />
-            </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="number">학번/번호</Label>
+                    <Input
+                      id="number"
+                      name="number"
+                      defaultValue={selectedUser.number || ''}
+                      placeholder="학번 또는 번호를 입력하세요"
+                    />
+                  </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="edit-name">이름</Label>
-              <Input
-                id="edit-name"
-                value={editFormData.name}
-                onChange={(e) => setEditFormData(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="이름"
-              />
-            </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="name">이름</Label>
+                    <Input
+                      id="name"
+                      name="name"
+                      defaultValue={selectedUser.name}
+                      required
+                    />
+                  </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="edit-role">역할</Label>
-              <Select
-                value={editFormData.role}
-                onValueChange={(value: any) => setEditFormData(prev => ({ ...prev, role: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="역할 선택" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="학생">학생</SelectItem>
-                  <SelectItem value="관리자">관리자</SelectItem>
-                  <SelectItem value="전공의">전공의</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="role">역할</Label>
+                    <Select name="role" defaultValue={selectedUser.role}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="학생">학생</SelectItem>
+                        <SelectItem value="전공의">전공의</SelectItem>
+                        <SelectItem value="관리자">관리자</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setIsEditDialogOpen(false)}
-              >
-                취소
-              </Button>
-              <Button onClick={handleUpdateUser}>
-                업데이트
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsEditDialogOpen(false)}
+                    >
+                      취소
+                    </Button>
+                    <Button type="submit">
+                      수정
+                    </Button>
+                  </div>
+                </form>
+              )}
+            </DialogContent>
+          </Dialog>
 
-      {/* 비밀번호 리셋 확인 다이얼로그 */}
-      <Dialog open={isPasswordResetDialogOpen} onOpenChange={setIsPasswordResetDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>비밀번호 초기화 확인</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p>
-              <strong>{selectedUser?.name}</strong>님의 비밀번호를 1111로 초기화하시겠습니까?
-            </p>
-            <Alert>
-              <AlertDescription>
-                초기화된 비밀번호는 해당 사용자에게 직접 전달해야 합니다.
-              </AlertDescription>
-            </Alert>
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setIsPasswordResetDialogOpen(false)}
-              >
-                취소
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={confirmPasswordReset}
-              >
-                초기화
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
+          {/* 비밀번호 초기화 다이얼로그 */}
+          <Dialog open={isPasswordResetDialogOpen} onOpenChange={setIsPasswordResetDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>비밀번호 초기화</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <Alert>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    {selectedUser?.name}님의 비밀번호를 초기화하시겠습니까?
+                    <br />
+                    초기화 후 새로운 임시 비밀번호가 이메일로 전송됩니다.
+                  </AlertDescription>
+                </Alert>
+
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsPasswordResetDialogOpen(false)}
+                  >
+                    취소
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={confirmPasswordReset}
+                  >
+                    초기화
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+      )}
+    </AuthGuard>
   )
 }

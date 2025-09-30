@@ -9,81 +9,114 @@ import { toast } from 'sonner'
 export function useUser() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
-  const [initialized, setInitialized] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const supabase = createSupabaseClient()
   const router = useRouter()
 
-  useEffect(() => {
-    if (initialized) return // 이미 초기화된 경우 재실행 방지
+  // 사용자 데이터 조회 함수
+  const fetchUserData = async (userId: string): Promise<User | null> => {
+    try {
+      const { data: userData, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single()
 
-    const getUser = async () => {
+      if (error) {
+        console.warn('사용자 데이터 조회 실패:', error)
+        setError('사용자 데이터를 불러올 수 없습니다.')
+        return null
+      }
+
+      setError(null)
+      return userData
+    } catch (error) {
+      console.warn('사용자 데이터 조회 중 오류:', error)
+      setError('사용자 데이터 조회 중 오류가 발생했습니다.')
+      return null
+    }
+  }
+
+  useEffect(() => {
+    let mounted = true
+
+    const initializeAuth = async () => {
       try {
+        setLoading(true)
+        setError(null)
+
+        // timeout을 설정하여 무한 로딩 방지
+        const timeoutId = setTimeout(() => {
+          if (mounted) {
+            console.warn('인증 초기화 타임아웃')
+            setError('인증 확인 중 시간이 초과되었습니다.')
+            setLoading(false)
+          }
+        }, 5000) // 5초 타임아웃
+
         const {
           data: { session },
         } = await supabase.auth.getSession()
 
-        if (session?.user) {
-          // 세션이 있으면 사용자 데이터 조회
-          const { data: userData, error } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', session.user.id)
-            .single()
+        clearTimeout(timeoutId)
 
-          if (error) {
-            console.warn('사용자 데이터 조회 실패:', error)
-            setUser(null)
-          } else if (userData) {
+        if (!mounted) return
+
+        if (session?.user) {
+          const userData = await fetchUserData(session.user.id)
+          if (mounted) {
             setUser(userData)
           }
         } else {
           setUser(null)
         }
       } catch (error) {
-        console.warn('인증 확인 중 오류:', error)
-        setUser(null)
+        if (mounted) {
+          console.warn('인증 초기화 중 오류:', error)
+          setError('인증 확인 중 오류가 발생했습니다.')
+          setUser(null)
+        }
       } finally {
-        setLoading(false)
-        setInitialized(true)
+        if (mounted) {
+          setLoading(false)
+        }
       }
     }
 
-    getUser()
+    initializeAuth()
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return
+
       console.log('인증 상태 변경:', event, session?.user?.id)
 
+      // 인증 상태 변경 시 로딩 상태 설정
       if (event === 'SIGNED_IN' && session?.user) {
-        try {
-          const { data: userData, error } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', session.user.id)
-            .single()
+        setLoading(true)
+        setError(null)
 
-          if (error) {
-            console.warn('로그인 후 사용자 데이터 조회 실패:', error)
-            setUser(null)
-          } else if (userData) {
-            setUser(userData)
-          }
-        } catch (error) {
-          console.warn('로그인 처리 중 오류:', error)
-          setUser(null)
+        const userData = await fetchUserData(session.user.id)
+        if (mounted) {
+          setUser(userData)
+          setLoading(false)
         }
       } else if (event === 'SIGNED_OUT') {
         setUser(null)
+        setError(null)
+        setLoading(false)
+      } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+        // 토큰 갱신 시에는 사용자 데이터를 다시 조회하지 않음
+        console.log('토큰 갱신됨')
       }
-
-      setLoading(false)
     })
 
     return () => {
+      mounted = false
       subscription.unsubscribe()
     }
-  }, [supabase, initialized])
+  }, [supabase])
 
   const signOut = async () => {
     try {
@@ -166,5 +199,40 @@ export function useUser() {
     }
   }
 
-  return { user, loading, signOut }
+  // 재시도 함수 - 강제로 페이지 새로고침
+  const retry = () => {
+    if (typeof window !== 'undefined') {
+      window.location.reload()
+    }
+  }
+
+  // 소프트 재시도 함수 - 인증만 다시 확인
+  const softRetry = async () => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const timeoutId = setTimeout(() => {
+        setError('재시도 중 시간이 초과되었습니다.')
+        setLoading(false)
+      }, 5000)
+
+      const { data: { session } } = await supabase.auth.getSession()
+      clearTimeout(timeoutId)
+
+      if (session?.user) {
+        const userData = await fetchUserData(session.user.id)
+        setUser(userData)
+      } else {
+        setUser(null)
+      }
+    } catch (error) {
+      console.warn('재시도 중 오류:', error)
+      setError('재시도 중 오류가 발생했습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return { user, loading, error, signOut, retry, softRetry }
 }

@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useUser } from '@/hooks/useUser'
+import { useState } from 'react'
 import { createSupabaseClient } from '@/lib/supabase'
+import { AuthGuard } from '@/components/auth/AuthGuard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -11,7 +11,6 @@ import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
 
 export default function MyPage() {
-  const { user, loading: userLoading } = useUser()
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
     number: '',
@@ -25,16 +24,7 @@ export default function MyPage() {
 
   const supabase = createSupabaseClient()
 
-  useEffect(() => {
-    if (user) {
-      setFormData({
-        number: user.number,
-        name: user.name,
-      })
-    }
-  }, [user])
-
-  const handleUpdateProfile = async (e: React.FormEvent) => {
+  const handleUpdateProfile = async (e: React.FormEvent, user: any) => {
     e.preventDefault()
     setIsLoading(true)
 
@@ -45,7 +35,7 @@ export default function MyPage() {
           number: formData.number,
           name: formData.name,
         })
-        .eq('id', user?.id)
+        .eq('id', user.id)
 
       if (error) throw error
 
@@ -95,162 +85,155 @@ export default function MyPage() {
     }
   }
 
-  // user가 아직 로딩 중인 경우
-  if (userLoading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">사용자 정보를 불러오고 있습니다...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // 로딩 완료 후 user가 없는 경우 (인증 실패)
-  if (!user) {
-    return (
-      <div className="text-center py-8">
-        <p className="text-muted-foreground">사용자 정보를 확인할 수 없습니다.</p>
-      </div>
-    )
-  }
-
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">My Page</h1>
-        <p className="text-muted-foreground mt-2">
-          개인정보를 확인하고 수정할 수 있습니다.
-        </p>
-      </div>
+    <AuthGuard>
+      {(user: any) => {
+        // useEffect를 여기서 호출
+        if (formData.number === '' && formData.name === '') {
+          setFormData({
+            number: user.number,
+            name: user.name,
+          })
+        }
 
-      <div className="grid gap-6 lg:gap-8">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg md:text-xl">기본 정보</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid gap-4 md:gap-6">
-              <div className="grid gap-2">
-                <Label>이메일</Label>
-                <Input value={user.email} disabled />
-                <p className="text-sm text-muted-foreground">
-                  이메일은 변경할 수 없습니다.
-                </p>
-              </div>
-
-              <div className="grid gap-2">
-                <Label>역할</Label>
-                <Input value={user.role} disabled />
-                <p className="text-sm text-muted-foreground">
-                  역할은 관리자만 변경할 수 있습니다.
-                </p>
-              </div>
-
-              <div className="grid gap-2">
-                <Label>가입일</Label>
-                <Input value={new Date(user.created_at).toLocaleDateString('ko-KR')} disabled />
-              </div>
+        return (
+          <div className="space-y-6">
+            <div>
+              <h1 className="text-3xl font-bold">My Page</h1>
+              <p className="text-muted-foreground mt-2">
+                개인정보를 확인하고 수정할 수 있습니다.
+              </p>
             </div>
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg md:text-xl">수정 가능한 정보</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleUpdateProfile} className="space-y-4 md:space-y-6">
-              <div className="grid gap-2">
-                <Label htmlFor="number">번호</Label>
-                <Input
-                  id="number"
-                  value={formData.number}
-                  onChange={(e) =>
-                    setFormData(prev => ({ ...prev, number: e.target.value }))
-                  }
-                  placeholder="학번 또는 번호"
-                  required
-                  className="text-base"
-                />
-              </div>
+            <div className="grid gap-6 lg:gap-8">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg md:text-xl">기본 정보</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid gap-4 md:gap-6">
+                    <div className="grid gap-2">
+                      <Label>이메일</Label>
+                      <Input value={user.email} disabled />
+                      <p className="text-sm text-muted-foreground">
+                        이메일은 변경할 수 없습니다.
+                      </p>
+                    </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="name">이름</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData(prev => ({ ...prev, name: e.target.value }))
-                  }
-                  placeholder="이름"
-                  required
-                  className="text-base"
-                />
-              </div>
+                    <div className="grid gap-2">
+                      <Label>역할</Label>
+                      <Input value={user.role} disabled />
+                      <p className="text-sm text-muted-foreground">
+                        역할은 관리자만 변경할 수 있습니다.
+                      </p>
+                    </div>
 
-              <Button
-                type="submit"
-                disabled={isLoading}
-                className="w-full md:w-auto"
-                size="lg"
-              >
-                {isLoading ? '업데이트 중...' : '프로필 업데이트'}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+                    <div className="grid gap-2">
+                      <Label>가입일</Label>
+                      <Input value={new Date(user.created_at).toLocaleDateString('ko-KR')} disabled />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg md:text-xl">비밀번호 변경</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handlePasswordChange} className="space-y-4 md:space-y-6">
-              <div className="grid gap-2">
-                <Label htmlFor="newPassword">새 비밀번호</Label>
-                <Input
-                  id="newPassword"
-                  type="password"
-                  value={passwordData.newPassword}
-                  onChange={(e) =>
-                    setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))
-                  }
-                  placeholder="새 비밀번호 (최소 6자)"
-                  required
-                  className="text-base"
-                />
-              </div>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg md:text-xl">수정 가능한 정보</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={(e) => handleUpdateProfile(e, user)} className="space-y-4 md:space-y-6">
+                    <div className="grid gap-2">
+                      <Label htmlFor="number">번호</Label>
+                      <Input
+                        id="number"
+                        value={formData.number}
+                        onChange={(e) =>
+                          setFormData(prev => ({ ...prev, number: e.target.value }))
+                        }
+                        placeholder="학번 또는 번호"
+                        required
+                        className="text-base"
+                      />
+                    </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="confirmPassword">새 비밀번호 확인</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  value={passwordData.confirmPassword}
-                  onChange={(e) =>
-                    setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))
-                  }
-                  placeholder="새 비밀번호 확인"
-                  required
-                  className="text-base"
-                />
-              </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="name">이름</Label>
+                      <Input
+                        id="name"
+                        value={formData.name}
+                        onChange={(e) =>
+                          setFormData(prev => ({ ...prev, name: e.target.value }))
+                        }
+                        placeholder="이름"
+                        required
+                        className="text-base"
+                      />
+                    </div>
 
-              <Button
-                type="submit"
-                disabled={isLoading}
-                variant="outline"
-                className="w-full md:w-auto"
-                size="lg"
-              >
-                {isLoading ? '변경 중...' : '비밀번호 변경'}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+                    <Button
+                      type="submit"
+                      disabled={isLoading}
+                      className="w-full md:w-auto"
+                      size="lg"
+                    >
+                      {isLoading ? '업데이트 중...' : '프로필 업데이트'}
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg md:text-xl">비밀번호 변경</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handlePasswordChange} className="space-y-4 md:space-y-6">
+                    <div className="grid gap-2">
+                      <Label htmlFor="newPassword">새 비밀번호</Label>
+                      <Input
+                        id="newPassword"
+                        type="password"
+                        value={passwordData.newPassword}
+                        onChange={(e) =>
+                          setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))
+                        }
+                        placeholder="새 비밀번호 (최소 6자)"
+                        required
+                        className="text-base"
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="confirmPassword">새 비밀번호 확인</Label>
+                      <Input
+                        id="confirmPassword"
+                        type="password"
+                        value={passwordData.confirmPassword}
+                        onChange={(e) =>
+                          setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))
+                        }
+                        placeholder="새 비밀번호 확인"
+                        required
+                        className="text-base"
+                      />
+                    </div>
+
+                    <Button
+                      type="submit"
+                      disabled={isLoading}
+                      variant="outline"
+                      className="w-full md:w-auto"
+                      size="lg"
+                    >
+                      {isLoading ? '변경 중...' : '비밀번호 변경'}
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        )
+      }}
+    </AuthGuard>
   )
 }

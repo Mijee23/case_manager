@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { createSupabaseClient } from '@/lib/supabase'
-import { useUser } from '@/hooks/useUser'
 import { ChartingProgress, User } from '@/types/database'
+import { AuthGuard } from '@/components/auth/AuthGuard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
@@ -20,45 +20,19 @@ interface ChartingStats {
 }
 
 export default function ChartingStatsPage() {
-  const { user } = useUser()
   const [stats, setStats] = useState<ChartingStats | null>(null)
   const [loading, setLoading] = useState(false)
 
   const supabase = createSupabaseClient()
 
+  // 데이터 로딩을 컴포넌트 레벨에서 처리
   useEffect(() => {
-    // 페이지 로드 시 즉시 데이터 fetch 시작
-    setLoading(true)
     fetchChartingStats()
-      .finally(() => {
-        setLoading(false)
-      })
-
-    // 뒤로가기/앞으로가기 이벤트 처리
-    const handlePopState = () => {
-      // 페이지 상태 복원
-      if (document.visibilityState === 'visible') {
-        fetchChartingStats()
-      }
-    }
-
-    // 페이지 가시성 변경 이벤트 처리 (탭 전환 등)
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        fetchChartingStats()
-      }
-    }
-
-    window.addEventListener('popstate', handlePopState)
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-
-    return () => {
-      window.removeEventListener('popstate', handlePopState)
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-    }
   }, [])
 
+
   const fetchChartingStats = async () => {
+    setLoading(true)
     try {
       // 학생 목록과 차팅 현황 데이터 가져오기
       const [studentsResult, chartingResult] = await Promise.all([
@@ -164,6 +138,8 @@ export default function ChartingStatsPage() {
         averageCharting: 0,
         averageDiagnosis: 0,
       })
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -200,37 +176,19 @@ export default function ChartingStatsPage() {
     )
   }
 
-  // 데이터 로딩 중인 경우
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">차팅 통계 데이터를 불러오고 있습니다...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // 관리자가 아닌 경우 (로딩 완료 후 체크)
-  if (user && user.role !== '관리자') {
-    return (
-      <div className="text-center py-8">
-        <p className="text-muted-foreground">관리자 권한이 필요합니다.</p>
-      </div>
-    )
-  }
-
   if (!stats) {
     return (
-      <div className="text-center py-8">
-        <p className="text-muted-foreground">통계 데이터를 불러올 수 없습니다.</p>
-      </div>
+      <AuthGuard requiredRole="관리자">
+        <div className="text-center py-8">
+          <p className="text-muted-foreground">통계 데이터를 불러오는 중...</p>
+        </div>
+      </AuthGuard>
     )
   }
 
   return (
-    <div className="space-y-6">
+    <AuthGuard requiredRole="관리자">
+      <div className="space-y-6">
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-3xl font-bold">차팅 현황 통계</h1>
@@ -309,6 +267,7 @@ export default function ChartingStatsPage() {
           />
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </AuthGuard>
   )
 }

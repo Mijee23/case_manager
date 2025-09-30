@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createSupabaseClient } from '@/lib/supabase'
-import { useUser } from '@/hooks/useUser'
+import { AuthGuard } from '@/components/auth/AuthGuard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -39,10 +39,8 @@ interface User {
 }
 
 export default function AdminCasesPage() {
-  const { user } = useUser()
   const [cases, setCases] = useState<Case[]>([])
   const [students, setStudents] = useState<User[]>([])
-  const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -54,43 +52,14 @@ export default function AdminCasesPage() {
 
   const supabase = createSupabaseClient()
 
+  // 데이터 로딩을 컴포넌트 레벨에서 처리
   useEffect(() => {
-    // 페이지 로드 시 즉시 데이터 fetch 시작
-    setLoading(true)
     Promise.all([fetchCases(true), fetchStudents()])
-      .finally(() => {
-        setLoading(false)
-      })
-
-    // 뒤로가기/앞으로가기 이벤트 처리
-    const handlePopState = () => {
-      // 페이지 상태 복원
-      if (document.visibilityState === 'visible') {
-        Promise.all([fetchCases(true), fetchStudents()])
-      }
-    }
-
-    // 페이지 가시성 변경 이벤트 처리 (탭 전환 등)
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        Promise.all([fetchCases(true), fetchStudents()])
-      }
-    }
-
-    window.addEventListener('popstate', handlePopState)
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-
-    return () => {
-      window.removeEventListener('popstate', handlePopState)
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-    }
   }, [])
+
 
   const fetchCases = async (keepLoadingState = false) => {
     try {
-      if (!keepLoadingState) {
-        setLoading(true)
-      }
 
       const { data, error } = await supabase
         .from('cases')
@@ -108,10 +77,7 @@ export default function AdminCasesPage() {
       // 에러 발생 시 빈 배열로 설정하여 UI가 정상적으로 렌더링되도록 함
       setCases([])
     } finally {
-      // keepLoadingState가 true가 아닌 경우에만 로딩 해제
-      if (!keepLoadingState) {
-        setLoading(false)
-      }
+      // 필요한 경우 추가 로직
     }
   }
 
@@ -264,29 +230,9 @@ export default function AdminCasesPage() {
     }
   }
 
-  // 데이터 로딩 중인 경우
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">케이스 데이터를 불러오고 있습니다...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // 관리자가 아닌 경우 (로딩 완료 후 체크)
-  if (user && user.role !== '관리자') {
-    return (
-      <div className="text-center py-8">
-        <p className="text-muted-foreground">관리자 권한이 필요합니다.</p>
-      </div>
-    )
-  }
-
   return (
-    <div className="space-y-6">
+    <AuthGuard requiredRole="관리자">
+      <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">전체 케이스 관리</h1>
         <p className="text-muted-foreground mt-2">
@@ -678,6 +624,7 @@ export default function AdminCasesPage() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </AuthGuard>
   )
 }

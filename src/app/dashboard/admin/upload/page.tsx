@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import { createSupabaseClient } from '@/lib/supabase'
-import { useUser } from '@/hooks/useUser'
 import { ExcelRowData, Case } from '@/types/database'
+import { AuthGuard } from '@/components/auth/AuthGuard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -32,7 +32,6 @@ interface DuplicateCheckResult {
 }
 
 export default function ExcelUploadPage() {
-  const { user } = useUser()
   const [file, setFile] = useState<File | null>(null)
   const [previewData, setPreviewData] = useState<ExcelRowData[]>([])
   const [duplicateCheckResults, setDuplicateCheckResults] = useState<DuplicateCheckResult | null>(null)
@@ -388,16 +387,10 @@ export default function ExcelUploadPage() {
     }
   }
 
-  if (!user || user.role !== '관리자') {
-    return (
-      <div className="text-center py-8">
-        <p className="text-muted-foreground">관리자 권한이 필요합니다.</p>
-      </div>
-    )
-  }
-
   return (
-    <div className="space-y-6">
+    <AuthGuard requiredRole="관리자">
+      {(user: any) => (
+        <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">엑셀 업로드</h1>
         <p className="text-muted-foreground mt-2">
@@ -804,6 +797,8 @@ export default function ExcelUploadPage() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+      )}
+    </AuthGuard>
   )
 }
